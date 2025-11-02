@@ -543,7 +543,9 @@ const getPasswordResetEmailTemplate = (firstName, resetUrl) => {
  */
 const sendVerificationEmail = async (email, firstName, verificationToken) => {
   try {
-    const verificationUrl = `${config.frontendUrl}/verify-email?token=${verificationToken}`;
+    // const verificationUrl = `${config.frontendUrl}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+  
     
     const msg = {
       to: email,

@@ -7,7 +7,7 @@ const {
   resendVerificationEmail,
   login,
   googleAuthSuccess,
-  forgotPassword,
+  forgotPassword, 
   resetPassword,
   checkAuth,
   logout,

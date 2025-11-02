@@ -24,6 +24,12 @@ export const verifyEmail = createAsyncThunk(
       const response = await axiosClient.get(
         `/auth/verify-email?token=${token}`
       );
+
+      // ✅ STORE TOKEN IN LOCALSTORAGE AS BACKUP
+      if (response.data.token) {
+        localStorage.setItem("token", response.data.token);
+      }
+
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -237,7 +243,13 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.success = action.payload.message;
         state.needsEmailVerification = false;
+
+        // ✅ OPTIONAL: Store token in localStorage for persistence
+        if (action.payload.token) {
+          localStorage.setItem("authToken", action.payload.token);
+        }
       })
+
       .addCase(verifyEmail.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;

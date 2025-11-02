@@ -132,26 +132,28 @@ const verifyEmail = async (req, res) => {
     const jwtToken = createJWTToken(user);
     
     // Set cookie
-    res.cookie('token', jwtToken, {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
-    });
-    
-    res.json({
-      success: true,
-      message: "Email verified successfully! You are now logged in.",
-      user: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        emailId: user.emailId,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        profilePicture: user.profilePicture
-      }
-    });
+  res.cookie('token', jwtToken, {
+  maxAge: 24 * 60 * 60 * 1000,
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'none',
+  domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
+});
+
+res.json({
+  success: true,
+  message: "Email verified successfully! You are now logged in.",
+  token: jwtToken,  // ✅ ADD THIS LINE
+  user: {
+    _id: user._id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    emailId: user.emailId,
+    role: user.role,
+    isEmailVerified: user.isEmailVerified,
+    profilePicture: user.profilePicture
+  }
+});
     
   } catch (error) {
     console.error('Email verification error:', error);
@@ -167,6 +169,8 @@ const resendVerificationEmail = async (req, res) => {
   try {
     const { emailId } = req.body;
     
+    console.log('📧 Resend verification request for:', emailId);
+    
     if (!emailId) {
       return res.status(400).json({
         success: false,
@@ -177,6 +181,7 @@ const resendVerificationEmail = async (req, res) => {
     const user = await User.findOne({ emailId });
     
     if (!user) {
+      console.log('❌ User not found:', emailId);
       return res.status(404).json({
         success: false,
         message: "User not found"
@@ -184,6 +189,7 @@ const resendVerificationEmail = async (req, res) => {
     }
     
     if (user.isEmailVerified) {
+      console.log('⚠️ Email already verified:', emailId);
       return res.status(400).json({
         success: false,
         message: "Email is already verified"
@@ -194,24 +200,37 @@ const resendVerificationEmail = async (req, res) => {
     const verificationToken = generateSecureToken();
     user.emailVerificationToken = verificationToken;
     user.emailVerificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await user.save();
+    
+    try {
+      await user.save();
+      console.log('✅ Token saved for user:', emailId);
+    } catch (saveError) {
+      console.error('❌ Failed to save token:', saveError);
+      throw new Error('Failed to save verification token');
+    }
     
     // Send verification email
-    await sendVerificationEmail(emailId, user.firstName, verificationToken);
+    try {
+      await sendVerificationEmail(emailId, user.firstName, verificationToken);
+      console.log('✅ Verification email sent to:', emailId);
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError);
+      // Don't fail the request, user can try again
+    }
     
     res.json({
       success: true,
       message: "Verification email sent successfully"
     });
-    
   } catch (error) {
-    console.error('Resend verification error:', error);
+    console.error('❌ Resend verification error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to send verification email"
+      message: error.message || "Failed to send verification email"
     });
   }
 };
+
 
 // Login
 const login = async (req, res) => {
