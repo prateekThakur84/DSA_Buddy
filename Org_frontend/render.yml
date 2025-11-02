@@ -1,0 +1,4 @@
+routes:
+  - path: "/*"
+    route: "/index.html"
+    status: 200
