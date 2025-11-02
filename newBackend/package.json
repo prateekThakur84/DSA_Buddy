@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@google/genai": "^1.26.0",
+    "@sendgrid/mail": "^8.1.6",
     "axios": "^1.9.0",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.6.1",
