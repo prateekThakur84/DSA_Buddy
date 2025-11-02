@@ -1,20 +1,42 @@
+//  =============================================================================
+// EMAIL UTILITY - SENDGRID INTEGRATION FOR RENDER
+// =============================================================================
+// This file handles all email sending functionality using SendGrid API
+// Compatible with Render deployment (SMTP ports are blocked on Render)
+// =============================================================================
+
 const nodemailer = require('nodemailer');
+const sgTransport = require('nodemailer-sendgrid-transport');
 require('dotenv').config();
 
-// Create reusable transporter
+// =============================================================================
+// TRANSPORTER CONFIGURATION
+// =============================================================================
+
+/**
+ * Create SendGrid transporter (works on Render)
+ * Uses SendGrid API instead of SMTP to avoid port blocking
+ */
 const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
-    secure: false, // Use TLS
-    auth: {
-      user: process.env.SMTP_EMAIL,
-      pass: process.env.SMTP_PASSWORD
-    }
-  });
+  return nodemailer.createTransport(
+    sgTransport({
+      auth: {
+        api_key: process.env.SENDGRID_API_KEY,
+      },
+    })
+  );
 };
 
-// Email verification template
+// =============================================================================
+// EMAIL TEMPLATES
+// =============================================================================
+
+/**
+ * Email verification template
+ * @param {string} firstName - User's first name
+ * @param {string} verificationUrl - Verification link URL
+ * @returns {string} HTML email template
+ */
 const getVerificationEmailTemplate = (firstName, verificationUrl) => {
   return `
     <!DOCTYPE html>
@@ -96,7 +118,11 @@ const getVerificationEmailTemplate = (firstName, verificationUrl) => {
   `;
 };
 
-// Welcome email template
+/**
+ * Welcome email template
+ * @param {string} firstName - User's first name
+ * @returns {string} HTML email template
+ */
 const getWelcomeEmailTemplate = (firstName) => {
   return `
     <!DOCTYPE html>
@@ -185,7 +211,12 @@ const getWelcomeEmailTemplate = (firstName) => {
   `;
 };
 
-// Password reset email template
+/**
+ * Password reset email template
+ * @param {string} firstName - User's first name
+ * @param {string} resetUrl - Password reset link URL
+ * @returns {string} HTML email template
+ */
 const getPasswordResetEmailTemplate = (firstName, resetUrl) => {
   return `
     <!DOCTYPE html>
@@ -286,73 +317,101 @@ const getPasswordResetEmailTemplate = (firstName, resetUrl) => {
   `;
 };
 
-// Send verification email
+// =============================================================================
+// EMAIL SENDING FUNCTIONS
+// =============================================================================
+
+/**
+ * Send verification email to user
+ * @param {string} email - Recipient email address
+ * @param {string} firstName - User's first name
+ * @param {string} verificationToken - Unique verification token
+ * @returns {Promise<Object>} Result with success status and messageId
+ */
 const sendVerificationEmail = async (email, firstName, verificationToken) => {
   try {
     const transporter = createTransporter();
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
     
     const mailOptions = {
-      from: `"DSA Buddy" <${process.env.SMTP_EMAIL}>`,
+      from: process.env.SENDGRID_FROM_EMAIL || `"DSA Buddy" <noreply@dsabuddy.com>`,
       to: email,
       subject: 'Verify Your Email Address - DSA Buddy',
-      html: getVerificationEmailTemplate(firstName, verificationUrl)
+      html: getVerificationEmailTemplate(firstName, verificationUrl),
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log('Verification email sent:', result.messageId);
+    console.log('✅ Verification email sent successfully:', result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('Error sending verification email:', error);
+    console.error('❌ Error sending verification email:', error.message);
+    console.error('Stack trace:', error.stack);
     throw new Error('Failed to send verification email');
   }
 };
 
-// Send welcome email
+/**
+ * Send welcome email after successful verification
+ * @param {string} email - Recipient email address
+ * @param {string} firstName - User's first name
+ * @returns {Promise<Object>} Result with success status and messageId
+ */
 const sendWelcomeEmail = async (email, firstName) => {
   try {
     const transporter = createTransporter();
     
     const mailOptions = {
-      from: `"DSA Buddy" <${process.env.SMTP_EMAIL}>`,
+      from: process.env.SENDGRID_FROM_EMAIL || `"DSA Buddy" <noreply@dsabuddy.com>`,
       to: email,
       subject: 'Welcome to DSA Buddy! 🎉',
-      html: getWelcomeEmailTemplate(firstName)
+      html: getWelcomeEmailTemplate(firstName),
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log('Welcome email sent:', result.messageId);
+    console.log('✅ Welcome email sent successfully:', result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('Error sending welcome email:', error);
+    console.error('❌ Error sending welcome email:', error.message);
+    console.error('Stack trace:', error.stack);
     throw new Error('Failed to send welcome email');
   }
 };
 
-// Send password reset email
+/**
+ * Send password reset email
+ * @param {string} email - Recipient email address
+ * @param {string} firstName - User's first name
+ * @param {string} resetToken - Unique password reset token
+ * @returns {Promise<Object>} Result with success status and messageId
+ */
 const sendPasswordResetEmail = async (email, firstName, resetToken) => {
   try {
     const transporter = createTransporter();
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
     
     const mailOptions = {
-      from: `"DSA Buddy" <${process.env.SMTP_EMAIL}>`,
+      from: process.env.SENDGRID_FROM_EMAIL || `"DSA Buddy" <noreply@dsabuddy.com>`,
       to: email,
       subject: 'Reset Your Password - DSA Buddy',
-      html: getPasswordResetEmailTemplate(firstName, resetUrl)
+      html: getPasswordResetEmailTemplate(firstName, resetUrl),
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log('Password reset email sent:', result.messageId);
+    console.log('✅ Password reset email sent successfully:', result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    console.error('Error sending password reset email:', error);
+    console.error('❌ Error sending password reset email:', error.message);
+    console.error('Stack trace:', error.stack);
     throw new Error('Failed to send password reset email');
   }
 };
 
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
 module.exports = {
   sendVerificationEmail,
   sendWelcomeEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
 };
