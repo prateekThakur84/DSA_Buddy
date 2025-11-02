@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import daisyui from 'daisyui' // ✅ Use ESM import
 
 export default defineConfig({
+  base: '/', 
   plugins: [
     react(),
     tailwindcss({
