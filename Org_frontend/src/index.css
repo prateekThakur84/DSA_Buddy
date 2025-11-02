@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+
+@plugin "daisyui";
+
+:root {
+  --ice-primary: #06b6d4;
+  --ice-secondary: #22d3ee;
+  --ice-accent: #67e8f9;
+  --ice-dark: #0f172a;
+  --ice-darker: #020617;
+}
+
+/* Custom scrollbar for ice theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #06b6d4, #22d3ee);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #0891b2, #06b6d4);
+}
+
+/* Custom loading spinner */
+.loading-spinner-ice {
+  border: 4px solid rgba(6, 182, 212, 0.1);
+  border-left: 4px solid #06b6d4;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Glass morphism helper classes */
+.glass-ice {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(6, 182, 212, 0.1);
+}
+
+.glass-ice-strong {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+/* Animate delay utilities */
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Custom gradient text */
+.text-gradient-ice {
+  background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 50%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
