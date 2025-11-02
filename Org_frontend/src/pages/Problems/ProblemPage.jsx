@@ -1,13 +1,12 @@
 import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
-import LeftPanel from "../../components/problemSolve/LeftPanel.jsx";
-import RightPanel from "../../components/problemSolve/RightPanel";
+import LeftPanel from "../../components/ProblemSolve/LeftPanel.jsx";
+import RightPanel from "../../components/ProblemSolve/RightPanel.jsx";
 // hello
 
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 
-
-import ResizableHandle from "../../components/problemSolve/ResizableHandle";
+import ResizableHandle from "../../components/ProblemSolve/ResizableHandle.jsx";
 
 import {
   fetchProblemById,

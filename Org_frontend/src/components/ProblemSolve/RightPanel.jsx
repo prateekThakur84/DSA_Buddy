@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import CodeEditor from './CodeEditor';
 import ResultsPanel from './ResultsPanel';
-import ResizableHandle from './ResizableHandle';
+import ResizableHandle from '../ProblemSolve/ResizableHandle';
 
 const RightPanel = ({
   code,
