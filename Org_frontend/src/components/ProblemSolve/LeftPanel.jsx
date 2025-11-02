@@ -36,7 +36,7 @@ const LeftPanel = ({ problem, submissions, activeTab, onTabChange }) => {
   return (
     <div className="h-full flex flex-col bg-gray-800 border-r border-gray-700">
       {/* Tab Navigation - Fixed at top */}
-      <div className="flex-shrink-0 border-b border-gray-700">
+      <div className=" border-b border-gray-700">
         <div className="flex overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => {
             const Icon = tab.icon;
