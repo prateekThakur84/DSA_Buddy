@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { X, Check, Crown } from 'lucide-react';
-import { fetchPlans, fetchPaymentPages, createSubscription } from '../../store/slices/subscriptionSlice';
+import { fetchPlans, fetchPaymentPages } from '../../store/slices/subscriptionSlice';
 import axiosClient from '../../utils/axiosClient';
 
 const SubscriptionModal = ({ isOpen, onClose }) => {
@@ -12,83 +12,116 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
+      console.log('🎯 SubscriptionModal opened');
       dispatch(fetchPlans());
       dispatch(fetchPaymentPages());
     }
   }, [isOpen, dispatch]);
 
-  // ✅ UPDATED: Create subscription first, then open Razorpay
+  // ✅ UPDATED WITH FULL DEBUGGING
   const handleSubscribe = async () => {
     try {
+      console.log('🔴 ========== SUBSCRIBE BUTTON CLICKED ==========');
       setLoading(true);
+
+      // Step 1: Check token
+      const token = localStorage.getItem('authToken');
+      console.log('🔐 Token exists:', !!token);
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       console.log('📍 Step 1: Creating subscription on backend...');
+      console.log('Sending request to: /payment/create-subscription');
+      console.log('Plan type:', selectedPlan);
 
       // Step 1: Create subscription on backend
       const subscriptionResponse = await axiosClient.post('/payment/create-subscription', {
         planType: selectedPlan
       });
 
-      console.log('✅ Subscription created:', subscriptionResponse.data);
+      console.log('✅ Step 1 SUCCESS - Subscription created:', subscriptionResponse.data);
 
       const {
         subscription: { subscriptionId, razorpayKeyId },
       } = subscriptionResponse.data;
 
-      console.log('📍 Step 2: Opening Razorpay checkout...');
+      if (!subscriptionId || !razorpayKeyId) {
+        throw new Error('Missing subscription ID or Razorpay key from response');
+      }
 
-      // Step 2: Open Razorpay checkout (not hosted page)
+      console.log('📍 Step 2: Opening Razorpay checkout...');
+      console.log('Subscription ID:', subscriptionId);
+      console.log('Razorpay Key:', razorpayKeyId);
+
+      // Check if Razorpay is loaded
+      if (!window.Razorpay) {
+        throw new Error('Razorpay script not loaded! Make sure to include the script in your HTML');
+      }
+
+      // Step 2: Open Razorpay checkout
       const options = {
         key: razorpayKeyId,
         subscription_id: subscriptionId,
         name: 'DSA Buddy',
         description: `${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Premium Plan`,
-        image: '/logo.png', // Your logo URL
+        image: '/logo.png',
         theme: {
           color: '#00d4ff'
         },
         handler: async function(response) {
-          console.log('✅ Payment successful:', response);
+          console.log('✅ Step 2 SUCCESS - Payment successful');
+          console.log('Payment response:', response);
 
           // Step 3: Verify payment
           try {
+            console.log('📍 Step 3: Verifying payment on backend...');
+            
             const verifyResponse = await axiosClient.post('/payment/verify-payment', {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_subscription_id: response.razorpay_subscription_id,
               razorpay_signature: response.razorpay_signature
             });
 
-            console.log('✅ Payment verified:', verifyResponse.data);
+            console.log('✅ Step 3 SUCCESS - Payment verified:', verifyResponse.data);
 
-            // Payment successful
             alert('🎉 Payment successful! You are now a premium member!');
             onClose();
-            
-            // Refresh subscription status
             window.location.reload();
           } catch (verifyError) {
-            console.error('❌ Payment verification failed:', verifyError);
-            alert('Payment verification failed. Please contact support.');
+            console.error('❌ Step 3 FAILED - Payment verification error:', verifyError);
+            console.error('Error response:', verifyError.response?.data);
+            console.error('Error message:', verifyError.message);
+            alert('Payment verification failed: ' + (verifyError.response?.data?.message || verifyError.message));
           }
         },
         modal: {
           ondismiss: function() {
-            console.log('⚠️ Payment checkout closed by user');
+            console.log('⚠️ User closed Razorpay modal');
+            setLoading(false);
           }
         }
       };
 
       const rzp = new window.Razorpay(options);
-      
+
       // Handle payment error
       rzp.on('payment.failed', function(response) {
-        console.error('❌ Payment failed:', response.error);
+        console.error('❌ Razorpay payment failed:', response.error);
+        setLoading(false);
         alert('Payment failed: ' + response.error.description);
       });
 
+      console.log('🎯 Opening Razorpay modal...');
       rzp.open();
+
     } catch (error) {
-      console.error('❌ Error during subscription:', error);
-      alert(error.response?.data?.message || 'Failed to create subscription. Please try again.');
+      console.error('❌ SUBSCRIPTION ERROR:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error message:', error.message);
+      console.error('Full error:', error);
+      
+      alert(error.response?.data?.message || error.message || 'Failed to create subscription. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -131,7 +164,6 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
                 }`}
                 onClick={() => !loading && !paymentLoading && setSelectedPlan(plan.type)}
               >
-                {/* Recommended Badge */}
                 {plan.recommended && (
                   <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
                     <span className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-lg">
@@ -140,7 +172,6 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
                   </div>
                 )}
                 
-                {/* Plan Header */}
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="text-lg font-bold text-white">{plan.name}</h3>
@@ -153,7 +184,6 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
                   )}
                 </div>
                 
-                {/* Pricing */}
                 <div className="mb-3">
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-bold text-cyan-400">₹{plan.amount}</span>
@@ -168,7 +198,6 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
                   )}
                 </div>
                 
-                {/* Features */}
                 <ul className="space-y-1.5">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-2">
@@ -181,14 +210,12 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
             ))}
           </div>
           
-          {/* Error Display */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-3 py-2 rounded-md mb-4">
               {error}
             </div>
           )}
           
-          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-center gap-2">
             <button
               onClick={onClose}
@@ -216,7 +243,6 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
             </button>
           </div>
           
-          {/* Terms */}
           <p className="text-center text-xs text-slate-500 mt-3">
             By subscribing, you agree to automatic renewal. Cancel anytime from settings.
           </p>
