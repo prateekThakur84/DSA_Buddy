@@ -60,9 +60,9 @@ const createSubscription = async (req, res) => {
     console.log('User email:', req.user?.emailId);
     console.log('Request body:', req.body);
     console.log('Plan type:', req.body.planType);
-    
+
     const { planType } = req.body;
-    const userId = req.user._id; // Use _id, not id
+    const userId = req.user._id; // ✅ Use _id, not id
 
     if (!['monthly', 'yearly'].includes(planType)) {
       console.log('❌ Invalid plan type:', planType);
@@ -97,7 +97,7 @@ const createSubscription = async (req, res) => {
     }
 
     const plan = SUBSCRIPTION_PLANS[planType];
-    
+
     console.log('📋 Using plan:', { planType, planId: plan.planId, amount: plan.amount });
 
     let customerId = user.razorpayCustomerId;
@@ -178,7 +178,6 @@ const createSubscription = async (req, res) => {
     });
   }
 };
-
 
 const verifyPayment = async (req, res) => {
   try {
@@ -281,7 +280,7 @@ const verifyPayment = async (req, res) => {
 
 const getSubscriptionStatus = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user._id; // ✅ FIX: Changed from req.user.id
     const user = await User.findById(userId).select(
       'subscriptionTier subscriptionStartDate subscriptionEndDate usageLimits paymentHistory'
     );
@@ -355,7 +354,7 @@ const getSubscriptionStatus = async (req, res) => {
 
 const cancelSubscription = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user._id; // ✅ FIX: Changed from req.user.id
     const user = await User.findById(userId);
 
     if (!user.razorpaySubscriptionId) {
