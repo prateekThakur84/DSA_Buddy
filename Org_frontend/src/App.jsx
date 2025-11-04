@@ -58,13 +58,13 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<EmailVerification />} />
         <Route path="/auth/google-callback" element={<GoogleCallback />} /> {/* ✅ ADDED */}
-        <Route path="/price" element={<PricingPage />} />
       </Route>
 
       {/* Main Application Routes */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<About />} />
+        <Route path="/price" element={<PricingPage />} />
         
         <Route
           path="/dashboard"
