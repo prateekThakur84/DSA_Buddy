@@ -28,12 +28,10 @@ const createJWTToken = (user) => {
 // Register user with email verification
 const register = async (req, res) => {
   try {
-    // Validate input data
     validate(req.body);
     
     const { firstName, lastName, emailId, password } = req.body;
     
-    // Check if user already exists
     const existingUser = await User.findOne({ emailId });
     if (existingUser) {
       return res.status(400).json({
@@ -42,13 +40,9 @@ const register = async (req, res) => {
       });
     }
     
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
-    
-    // Generate email verification token
     const verificationToken = generateSecureToken();
     
-    // Create user (unverified)
     const user = new User({
       firstName,
       lastName: lastName || '',
@@ -57,17 +51,15 @@ const register = async (req, res) => {
       role: 'user',
       isEmailVerified: false,
       emailVerificationToken: verificationToken,
-      emailVerificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      emailVerificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000)
     });
     
     await user.save();
     
-    // Send verification email
     try {
       await sendVerificationEmail(emailId, firstName, verificationToken);
     } catch (emailError) {
       console.error('Email sending failed:', emailError);
-      // Don't fail registration if email sending fails
     }
     
     res.status(201).json({
@@ -90,7 +82,7 @@ const register = async (req, res) => {
   }
 };
 
-// Verify email
+// ✅ UPDATED: Verify email
 const verifyEmail = async (req, res) => {
   try {
     const { token } = req.query;
@@ -102,7 +94,6 @@ const verifyEmail = async (req, res) => {
       });
     }
     
-    // Find user with this verification token
     const user = await User.findOne({
       emailVerificationToken: token,
       emailVerificationTokenExpires: { $gt: new Date() }
@@ -115,45 +106,35 @@ const verifyEmail = async (req, res) => {
       });
     }
     
-    // Verify email
     user.isEmailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationTokenExpires = undefined;
     await user.save();
     
-    // Send welcome email
     try {
       await sendWelcomeEmail(user.emailId, user.firstName);
     } catch (emailError) {
       console.error('Welcome email failed:', emailError);
     }
     
-    // Create JWT token for automatic login
     const jwtToken = createJWTToken(user);
     
-    // Set cookie
-  res.cookie('token', jwtToken, {
-  maxAge: 24 * 60 * 60 * 1000,
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
-  // domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
-});
-
-res.json({
-  success: true,
-  message: "Email verified successfully! You are now logged in.",
-  token: jwtToken,  // ✅ ADD THIS LINE
-  user: {
-    _id: user._id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    emailId: user.emailId,
-    role: user.role,
-    isEmailVerified: user.isEmailVerified,
-    profilePicture: user.profilePicture
-  }
-});
+    // ✅ REMOVED: Cookie setting
+    // ✅ ADDED: Token in response
+    res.json({
+      success: true,
+      message: "Email verified successfully! You are now logged in.",
+      token: jwtToken, // ✅ Send token in response
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        emailId: user.emailId,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        profilePicture: user.profilePicture
+      }
+    });
     
   } catch (error) {
     console.error('Email verification error:', error);
@@ -164,7 +145,7 @@ res.json({
   }
 };
 
-// Resend verification email
+// Resend verification email (no changes needed)
 const resendVerificationEmail = async (req, res) => {
   try {
     const { emailId } = req.body;
@@ -196,7 +177,6 @@ const resendVerificationEmail = async (req, res) => {
       });
     }
     
-    // Generate new verification token
     const verificationToken = generateSecureToken();
     user.emailVerificationToken = verificationToken;
     user.emailVerificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -209,13 +189,11 @@ const resendVerificationEmail = async (req, res) => {
       throw new Error('Failed to save verification token');
     }
     
-    // Send verification email
     try {
       await sendVerificationEmail(emailId, user.firstName, verificationToken);
       console.log('✅ Verification email sent to:', emailId);
     } catch (emailError) {
       console.error('❌ Email sending failed:', emailError);
-      // Don't fail the request, user can try again
     }
     
     res.json({
@@ -231,8 +209,7 @@ const resendVerificationEmail = async (req, res) => {
   }
 };
 
-
-// Login
+// ✅ UPDATED: Login
 const login = async (req, res) => {
   try {
     const { emailId, password } = req.body;
@@ -244,7 +221,6 @@ const login = async (req, res) => {
       });
     }
     
-    // Find user
     const user = await User.findOne({ emailId });
     if (!user) {
       return res.status(401).json({
@@ -253,7 +229,6 @@ const login = async (req, res) => {
       });
     }
     
-    // Check if user has a password (might be Google OAuth only user)
     if (!user.password) {
       return res.status(401).json({
         success: false,
@@ -261,7 +236,6 @@ const login = async (req, res) => {
       });
     }
     
-    // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({
@@ -270,7 +244,6 @@ const login = async (req, res) => {
       });
     }
     
-    // Check if email is verified
     if (!user.isEmailVerified) {
       return res.status(403).json({
         success: false,
@@ -279,24 +252,17 @@ const login = async (req, res) => {
       });
     }
     
-    // Update last login
     user.lastLoginAt = new Date();
     await user.save();
     
-    // Create JWT token
     const token = createJWTToken(user);
     
-    // Set cookie
-    res.cookie('token', token, {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
-    });
-    
+    // ✅ REMOVED: Cookie setting
+    // ✅ ADDED: Token in response
     res.json({
       success: true,
       message: "Login successful",
+      token: token, // ✅ Send token in response
       user: {
         _id: user._id,
         firstName: user.firstName,
@@ -317,24 +283,14 @@ const login = async (req, res) => {
   }
 };
 
-// Google OAuth success callback
+// ✅ UPDATED: Google OAuth success callback
 const googleAuthSuccess = async (req, res) => {
   try {
     const user = req.user;
-    
-    // Create JWT token
     const token = createJWTToken(user);
     
-    // Set cookie
-    res.cookie('token', token, {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
-    });
-    
-    // Redirect to frontend
-    res.redirect(`${process.env.FRONTEND_URL}?auth=success`);
+    // ✅ UPDATED: Redirect with token in URL (frontend will handle storing it)
+    res.redirect(`${process.env.FRONTEND_URL}/auth/google-callback?token=${token}`);
     
   } catch (error) {
     console.error('Google auth success error:', error);
@@ -342,7 +298,7 @@ const googleAuthSuccess = async (req, res) => {
   }
 };
 
-// Forgot password
+// Forgot password (no changes needed)
 const forgotPassword = async (req, res) => {
   try {
     const { emailId } = req.body;
@@ -357,14 +313,12 @@ const forgotPassword = async (req, res) => {
     const user = await User.findOne({ emailId });
     
     if (!user) {
-      // Don't reveal if user exists or not
       return res.json({
         success: true,
         message: "If an account with that email exists, we've sent a password reset link"
       });
     }
     
-    // Check if user has password (not Google OAuth only)
     if (!user.password) {
       return res.status(400).json({
         success: false,
@@ -372,15 +326,12 @@ const forgotPassword = async (req, res) => {
       });
     }
     
-    // Generate reset token
     const resetToken = generateSecureToken();
     
-    // Save reset token to user
     user.passwordResetToken = resetToken;
-    user.passwordResetTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    user.passwordResetTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save();
     
-    // Send password reset email
     await sendPasswordResetEmail(emailId, user.firstName, resetToken);
     
     res.json({
@@ -397,7 +348,7 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-// Reset password
+// Reset password (no changes needed)
 const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
@@ -409,7 +360,6 @@ const resetPassword = async (req, res) => {
       });
     }
     
-    // Validate password strength
     if (newPassword.length < 8) {
       return res.status(400).json({
         success: false,
@@ -417,7 +367,6 @@ const resetPassword = async (req, res) => {
       });
     }
     
-    // Find user with valid reset token
     const user = await User.findOne({
       passwordResetToken: token,
       passwordResetTokenExpires: { $gt: new Date() }
@@ -430,10 +379,8 @@ const resetPassword = async (req, res) => {
       });
     }
     
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     
-    // Update password and clear reset token
     user.password = hashedPassword;
     user.passwordResetToken = undefined;
     user.passwordResetTokenExpires = undefined;
@@ -453,10 +400,21 @@ const resetPassword = async (req, res) => {
   }
 };
 
-// Check auth status
+// ✅ UPDATED: Check auth status
 const checkAuth = async (req, res) => {
   try {
-    const { token } = req.cookies;
+    // ✅ UPDATED: Read from Authorization header
+    let token = null;
+    
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+    
+    // Fallback to cookies
+    if (!token && req.cookies.token) {
+      token = req.cookies.token;
+    }
     
     if (!token) {
       return res.status(401).json({
@@ -465,10 +423,8 @@ const checkAuth = async (req, res) => {
       });
     }
     
-    // Verify JWT token
     const payload = jwt.verify(token, process.env.JWT_KEY);
     
-    // Check if token is blacklisted in Redis
     const isBlacklisted = await redisClient.exists(`token:${token}`);
     if (isBlacklisted) {
       return res.status(401).json({
@@ -477,7 +433,6 @@ const checkAuth = async (req, res) => {
       });
     }
     
-    // Find user
     const user = await User.findById(payload._id).select('-password');
     if (!user) {
       return res.status(401).json({
@@ -515,13 +470,23 @@ const checkAuth = async (req, res) => {
   }
 };
 
-// Logout
+// ✅ UPDATED: Logout
 const logout = async (req, res) => {
   try {
-    const { token } = req.cookies;
+    // ✅ UPDATED: Get token from Authorization header
+    let token = null;
+    
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+    
+    // Fallback to cookies
+    if (!token && req.cookies.token) {
+      token = req.cookies.token;
+    }
     
     if (token) {
-      // Add token to Redis blacklist
       const payload = jwt.decode(token);
       if (payload && payload.exp) {
         await redisClient.set(`token:${token}`, 'blacklisted');
@@ -529,7 +494,7 @@ const logout = async (req, res) => {
       }
     }
     
-    // Clear cookie
+    // Clear cookie if exists
     res.cookie("token", null, { expires: new Date(Date.now()) });
     
     res.json({
@@ -546,7 +511,7 @@ const logout = async (req, res) => {
   }
 };
 
-// Get user profile
+// Get user profile (no changes - already uses middleware)
 const getUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.result._id)
@@ -574,13 +539,12 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-// Update user profile
-const  updateUserProfile = async (req, res) => {
+// Update user profile (no changes - already uses middleware)
+const updateUserProfile = async (req, res) => {
   try {
     const { firstName, lastName, age } = req.body;
     const userId = req.result._id;
     
-    // Prepare update object
     const updateData = {};
     if (firstName) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
@@ -614,7 +578,7 @@ const  updateUserProfile = async (req, res) => {
   }
 };
 
-// Change password
+// Change password (no changes - already uses middleware)
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -635,7 +599,6 @@ const changePassword = async (req, res) => {
       });
     }
     
-    // Verify current password
     const isValidPassword = await bcrypt.compare(currentPassword, user.password);
     if (!isValidPassword) {
       return res.status(400).json({
@@ -644,7 +607,6 @@ const changePassword = async (req, res) => {
       });
     }
     
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
     await user.save();
@@ -663,15 +625,13 @@ const changePassword = async (req, res) => {
   }
 };
 
-// Delete account
+// Delete account (no changes - already uses middleware)
 const deleteProfile = async (req, res) => {
   try {
     const userId = req.result._id;
     
-    // Delete user
     await User.findByIdAndDelete(userId);
     
-    // Clear cookie
     res.cookie("token", null, { expires: new Date(Date.now()) });
     
     res.json({
@@ -688,7 +648,7 @@ const deleteProfile = async (req, res) => {
   }
 };
 
-// Admin register (keeping for backward compatibility)
+// ✅ UPDATED: Admin register
 const adminRegister = async (req, res) => {
   try {
     validate(req.body);
@@ -696,16 +656,18 @@ const adminRegister = async (req, res) => {
     
     req.body.password = await bcrypt.hash(password, 12);
     req.body.role = 'admin';
-    req.body.isEmailVerified = true; // Admin accounts are pre-verified
+    req.body.isEmailVerified = true;
     
     const user = await User.create(req.body);
     
     const token = createJWTToken(user);
     
-    res.cookie('token', token, { maxAge: 24 * 60 * 60 * 1000 });
+    // ✅ REMOVED: Cookie setting
+    // ✅ ADDED: Token in response
     res.status(201).json({
       success: true,
-      message: "Admin registered successfully"
+      message: "Admin registered successfully",
+      token: token // ✅ Send token in response
     });
     
   } catch (error) {

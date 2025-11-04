@@ -10,7 +10,7 @@ const connectDatabase = require("./src/config/database.config");
 const redisClient = require("./src/config/redis.config");
 const { PORT, FRONTEND_URL, NODE_ENV } = require("./src/config/constants");
 
-// Import individual routes directly
+// Import individual routes
 const authRoutes = require("./src/routes/auth.routes");
 const problemRoutes = require("./src/routes/problem.routes");
 const submissionRoutes = require("./src/routes/submission.routes");
@@ -30,39 +30,29 @@ const app = express();
 // MIDDLEWARE CONFIGURATION
 // ========================================
 
-// // CORS configuration
-// app.use(
-//   cors({
-//     origin: FRONTEND_URL,
-//     credentials: true,
-//   })
-// );
-
-
+// ✅ UPDATED: Simplified CORS (no credentials needed for localStorage auth)
 app.use(
   cors({
-    origin: FRONTEND_URL, // Make sure FRONTEND_URL includes 'https://'
-    credentials: true,
+    origin: FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    optionsSuccessStatus: 200 // For legacy browser support
+    allowedHeaders: ['Content-Type', 'Authorization'], // Added Authorization header
+    optionsSuccessStatus: 200
   })
 );
-
 
 // Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
+app.use(cookieParser()); // Keep for Google OAuth session
 
-// Session configuration (required for Passport)
+// Session configuration (ONLY for Google OAuth)
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-session-secret-here",
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       secure: NODE_ENV === "production",
       httpOnly: true,
       sameSite: "lax",
@@ -70,9 +60,19 @@ app.use(
   })
 );
 
-// Initialize Passport middleware
+// Initialize Passport middleware (for Google OAuth)
 app.use(passport.initialize());
 app.use(passport.session());
+
+// ✅ ADDED: Debug middleware (optional - remove in production)
+app.use((req, res, next) => {
+  console.log('🔍 Request:', {
+    path: req.path,
+    method: req.method,
+    authorization: req.headers.authorization ? 'Present' : 'Missing'
+  });
+  next();
+});
 
 // ========================================
 // ROUTES
@@ -87,7 +87,7 @@ app.use("/payment", paymentRoutes);
 app.use(
   "/api/usage",
   authenticateUser,
-  checkVideoSolutionLimit, // Add this middleware to check limits
+  checkVideoSolutionLimit,
   usageRouter
 );
 

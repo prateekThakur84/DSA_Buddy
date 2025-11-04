@@ -37,8 +37,19 @@ const verifyToken = async (token) => {
 const authenticate = (allowedRoles = ['user', 'admin']) => {
   return async (req, res, next) => {
     try {
-      // Extract token from cookies
-      const { token } = req.cookies;
+      // ✅ UPDATED: Extract token from Authorization header first
+      let token = null;
+      
+      // Check Authorization header
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.slice(7); // Remove "Bearer " prefix
+      }
+      
+      // ✅ OPTIONAL: Fallback to cookies for backward compatibility
+      if (!token && req.cookies.token) {
+        token = req.cookies.token;
+      }
 
       if (!token) {
         return sendErrorResponse(res, 401, 'Authentication required');
@@ -93,7 +104,17 @@ const authenticateAdmin = authenticate(['admin']);
  */
 const optionalAuth = async (req, res, next) => {
   try {
-    const { token } = req.cookies;
+    // Check Authorization header first
+    let token = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.slice(7);
+    }
+    
+    // Fallback to cookies
+    if (!token && req.cookies.token) {
+      token = req.cookies.token;
+    }
 
     if (token) {
       const payload = await verifyToken(token);

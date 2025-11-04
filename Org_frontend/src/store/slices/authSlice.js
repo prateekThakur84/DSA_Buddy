@@ -25,9 +25,9 @@ export const verifyEmail = createAsyncThunk(
         `/auth/verify-email?token=${token}`
       );
 
-      // ✅ STORE TOKEN IN LOCALSTORAGE AS BACKUP
+      // ✅ UPDATED: Store token in localStorage
       if (response.data.token) {
-        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("authToken", response.data.token);
       }
 
       return response.data;
@@ -62,6 +62,12 @@ export const loginUser = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await axiosClient.post("/auth/login", credentials);
+      
+      // ✅ UPDATED: Store token in localStorage
+      if (response.data.token) {
+        localStorage.setItem("authToken", response.data.token);
+      }
+      
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -76,11 +82,20 @@ export const checkAuth = createAsyncThunk(
   "auth/check",
   async (_, { rejectWithValue }) => {
     try {
+      // ✅ UPDATED: Check if token exists first
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        return rejectWithValue(null);
+      }
+      
       const response = await axiosClient.get("/auth/check");
       return response.data;
     } catch (error) {
+      // ✅ UPDATED: Clear token on auth failure
+      localStorage.removeItem("authToken");
+      
       if (error.response?.status === 401) {
-        return rejectWithValue(null); // Special case for no session
+        return rejectWithValue(null);
       }
       return rejectWithValue(
         error.response?.data?.message || "Auth check failed"
@@ -130,8 +145,15 @@ export const logoutUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await axiosClient.post("/auth/logout");
+      
+      // ✅ UPDATED: Clear token from localStorage
+      localStorage.removeItem("authToken");
+      
       return null;
     } catch (error) {
+      // ✅ UPDATED: Clear token even if logout request fails
+      localStorage.removeItem("authToken");
+      
       return rejectWithValue(error.response?.data?.message || "Logout failed");
     }
   }
@@ -243,13 +265,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.success = action.payload.message;
         state.needsEmailVerification = false;
-
-        // ✅ OPTIONAL: Store token in localStorage for persistence
-        if (action.payload.token) {
-          localStorage.setItem("authToken", action.payload.token);
-        }
       })
-
       .addCase(verifyEmail.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
