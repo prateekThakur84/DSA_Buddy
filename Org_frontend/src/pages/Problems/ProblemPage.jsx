@@ -22,8 +22,12 @@ import { useParams } from "react-router";
 import { useEffect, useState } from "react";
 
 const ProblemPage = () => {
-  // ✅ FIX: Get 'id' from route params (matches /problem/:id)
-  const { id: problemId } = useParams();
+  // ✅ Get id from route params
+  const { id } = useParams();
+  
+  // ✅ DEBUG: Log the URL parameter immediately
+  console.log("🔍 URL Route Param (id):", id);
+
   const dispatch = useDispatch();
 
   // Redux state
@@ -48,17 +52,27 @@ const ProblemPage = () => {
     { id: "java", name: "Java" },
   ];
 
-  // Fetch problem and submissions on mount or when problemId changes
+  // ✅ MAIN ISSUE: Fetch problem and submissions on mount
   useEffect(() => {
-    if (problemId) {
-      dispatch(setCurrentProblem(problemId));
-      dispatch(fetchProblemById(problemId));
-      dispatch(fetchSubmissions(problemId));
+    console.log("📍 useEffect triggered, id:", id);
+    
+    if (id) {
+      console.log("✅ ID exists, fetching problem...");
+      
+      dispatch(setCurrentProblem(id));
+      dispatch(fetchProblemById(id)); // ✅ THIS SHOULD TRIGGER API CALL
+      dispatch(fetchSubmissions(id));
+      
+      console.log("📤 Dispatched fetchProblemById and fetchSubmissions");
+    } else {
+      console.log("❌ ERROR: id is undefined!", { id });
     }
-  }, [problemId, dispatch]);
+  }, [id, dispatch]);
 
   // Update code when language or problem changes
   useEffect(() => {
+    console.log("🎯 Problem loaded:", problem?.title || "No problem yet");
+    
     if (problem && problem.startCode) {
       const initialCode = problem.startCode.find(
         (c) => c.language === selectedLanguage
@@ -70,23 +84,21 @@ const ProblemPage = () => {
   // Handle run code
   const handleRunCode = async () => {
     dispatch(clearRunResult());
-    dispatch(runCode({ problemId, code, language: selectedLanguage }));
+    dispatch(runCode({ problemId: id, code, language: selectedLanguage }));
   };
 
   // Handle submit code
   const handleSubmitCode = async () => {
     dispatch(clearSubmitResult());
     const result = await dispatch(
-      submitCode({ problemId, code, language: selectedLanguage })
+      submitCode({ problemId: id, code, language: selectedLanguage })
     );
 
-    // If submission was successful, mark problem as solved
     if (result.payload?.data?.success) {
-      dispatch(markProblemSolved(problemId));
+      dispatch(markProblemSolved(id));
     }
 
-    // Refresh submissions after submit
-    dispatch(fetchSubmissions(problemId));
+    dispatch(fetchSubmissions(id));
   };
 
   // Handle reset code
@@ -120,6 +132,7 @@ const ProblemPage = () => {
           <p className="text-gray-400">
             The problem you're looking for doesn't exist.
           </p>
+          <p className="text-yellow-400 mt-2">Debug: id = {id}</p>
         </div>
       </div>
     );
@@ -133,7 +146,6 @@ const ProblemPage = () => {
         className="h-full"
       >
         <PanelGroup direction="horizontal" className="h-full">
-          {/* Left Panel */}
           <Panel defaultSize={45} minSize={30} className="h-full">
             <LeftPanel
               problem={problem}
@@ -144,12 +156,10 @@ const ProblemPage = () => {
             />
           </Panel>
 
-          {/* Resize Handle */}
           <PanelResizeHandle className="w-2 bg-gray-700 hover:bg-gray-600 transition-colors">
             <ResizableHandle direction="vertical" />
           </PanelResizeHandle>
 
-          {/* Right Panel */}
           <Panel defaultSize={55} minSize={35} className="h-full">
             <RightPanel
               code={code}
