@@ -10,10 +10,19 @@ const verifyWebhookSignature = (body, signature) => {
     return false;
   }
   
+  // ✅ FIXED: If body is already a Buffer, use it directly
+  const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+  
   const generatedSignature = crypto
     .createHmac('sha256', webhookSecret)
-    .update(JSON.stringify(body))
+    .update(bodyString)
     .digest('hex');
+  
+  console.log('🔐 Webhook signature verification:', {
+    received: signature,
+    generated: generatedSignature,
+    match: generatedSignature === signature
+  });
   
   return generatedSignature === signature;
 };
@@ -22,21 +31,39 @@ const handleSubscriptionWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-razorpay-signature'];
     
+    console.log('🔔 Webhook received:', {
+      signature: signature ? '✓ Present' : '✗ Missing',
+      contentType: req.headers['content-type'],
+      bodyType: typeof req.body
+    });
+    
     if (!signature) {
       console.error('No signature in webhook request');
       return res.status(400).json({ success: false, message: 'Missing signature' });
     }
 
-    if (!verifyWebhookSignature(req.body, signature)) {
+    // ✅ FIXED: Convert buffer to string if needed
+    let bodyToVerify = req.body;
+    if (Buffer.isBuffer(req.body)) {
+      bodyToVerify = req.body.toString('utf8');
+    }
+
+    if (!verifyWebhookSignature(bodyToVerify, signature)) {
       console.error('Invalid webhook signature');
       return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
-    const { event, payload } = req.body;
+    // ✅ FIXED: Parse body if it's a string
+    let body = req.body;
+    if (typeof body === 'string') {
+      body = JSON.parse(body);
+    }
+
+    const { event, payload } = body;
     const subscriptionData = payload.subscription?.entity;
     const paymentData = payload.payment?.entity;
 
-    console.log(`✓ Webhook received: ${event} for subscription: ${subscriptionData?.id}`);
+    console.log(`✓ Webhook verified and processed: ${event} for subscription: ${subscriptionData?.id}`);
 
     switch (event) {
       case 'subscription.activated':
@@ -79,6 +106,8 @@ const handleSubscriptionWebhook = async (req, res) => {
 
 const handleSubscriptionActivated = async (data) => {
   try {
+    console.log(`📍 Processing subscription.activated for: ${data.id}`);
+    
     const subscription = await Subscription.findOne({ razorpaySubscriptionId: data.id });
     if (!subscription) {
       console.error(`Subscription not found: ${data.id}`);
@@ -92,15 +121,23 @@ const handleSubscriptionActivated = async (data) => {
     subscription.currentEnd = new Date(data.current_end * 1000);
     subscription.nextBillingDate = data.charge_at ? new Date(data.charge_at * 1000) : null;
     await subscription.save();
+    
+    console.log(`✅ Subscription updated in DB: ${data.id}`);
 
     const user = await User.findById(subscription.userId);
     if (user) {
+      console.log(`📝 Updating user ${user._id} to premium`);
+      
       user.subscriptionTier = 'premium';
       user.subscriptionStartDate = subscription.startDate;
       user.subscriptionEndDate = subscription.endDate;
       user.razorpaySubscriptionId = data.id;
+      
       await user.save();
-      console.log(`✓ User ${user._id} activated premium until ${subscription.endDate}`);
+      
+      console.log(`✅ User ${user._id} updated to premium until ${subscription.endDate}`);
+    } else {
+      console.error(`User not found for subscription: ${subscription.userId}`);
     }
   } catch (error) {
     console.error('Error handling subscription.activated:', error);
@@ -109,6 +146,8 @@ const handleSubscriptionActivated = async (data) => {
 
 const handleSubscriptionCharged = async (subscriptionData, paymentData) => {
   try {
+    console.log(`📍 Processing subscription.charged for: ${subscriptionData.id}`);
+    
     const subscription = await Subscription.findOne({ razorpaySubscriptionId: subscriptionData.id });
     if (!subscription) {
       console.error(`Subscription not found: ${subscriptionData.id}`);
@@ -119,9 +158,13 @@ const handleSubscriptionCharged = async (subscriptionData, paymentData) => {
     subscription.currentEnd = new Date(subscriptionData.current_end * 1000);
     subscription.nextBillingDate = subscriptionData.charge_at ? new Date(subscriptionData.charge_at * 1000) : null;
     await subscription.save();
+    
+    console.log(`✅ Subscription charged updated in DB: ${subscriptionData.id}`);
 
     const user = await User.findById(subscription.userId);
     if (user && paymentData) {
+      console.log(`📝 Updating user ${user._id} with new charge`);
+      
       user.subscriptionEndDate = new Date(subscriptionData.current_end * 1000);
       user.paymentHistory.push({
         paymentId: paymentData.id,
@@ -132,8 +175,12 @@ const handleSubscriptionCharged = async (subscriptionData, paymentData) => {
         planType: subscription.planType,
         createdAt: new Date()
       });
+      
       await user.save();
-      console.log(`✓ Subscription renewed for user ${user._id} until ${user.subscriptionEndDate}`);
+      
+      console.log(`✅ User ${user._id} subscription renewed until ${user.subscriptionEndDate}`);
+    } else {
+      console.error(`User not found for subscription: ${subscription.userId}`);
     }
   } catch (error) {
     console.error('Error handling subscription.charged:', error);
@@ -142,13 +189,16 @@ const handleSubscriptionCharged = async (subscriptionData, paymentData) => {
 
 const handleSubscriptionCancelled = async (data) => {
   try {
+    console.log(`📍 Processing subscription.cancelled for: ${data.id}`);
+    
     const subscription = await Subscription.findOne({ razorpaySubscriptionId: data.id });
     if (!subscription) return;
 
     subscription.status = 'cancelled';
     subscription.cancelledAt = new Date();
     await subscription.save();
-    console.log(`✓ Subscription cancelled: ${data.id} (access until ${subscription.endDate})`);
+    
+    console.log(`✅ Subscription cancelled: ${data.id} (access until ${subscription.endDate})`);
   } catch (error) {
     console.error('Error handling subscription.cancelled:', error);
   }
@@ -156,6 +206,8 @@ const handleSubscriptionCancelled = async (data) => {
 
 const handleSubscriptionPaused = async (data) => {
   try {
+    console.log(`📍 Processing subscription.paused for: ${data.id}`);
+    
     const subscription = await Subscription.findOne({ razorpaySubscriptionId: data.id });
     if (!subscription) return;
 
@@ -166,7 +218,7 @@ const handleSubscriptionPaused = async (data) => {
     if (user) {
       user.subscriptionTier = 'free';
       await user.save();
-      console.log(`✓ Subscription paused, user ${user._id} downgraded to free`);
+      console.log(`✅ Subscription paused, user ${user._id} downgraded to free`);
     }
   } catch (error) {
     console.error('Error handling subscription.paused:', error);
@@ -175,6 +227,8 @@ const handleSubscriptionPaused = async (data) => {
 
 const handleSubscriptionResumed = async (data) => {
   try {
+    console.log(`📍 Processing subscription.resumed for: ${data.id}`);
+    
     const subscription = await Subscription.findOne({ razorpaySubscriptionId: data.id });
     if (!subscription) return;
 
@@ -187,7 +241,7 @@ const handleSubscriptionResumed = async (data) => {
       user.subscriptionTier = 'premium';
       user.subscriptionEndDate = subscription.endDate;
       await user.save();
-      console.log(`✓ Subscription resumed, user ${user._id} upgraded to premium`);
+      console.log(`✅ Subscription resumed, user ${user._id} upgraded to premium`);
     }
   } catch (error) {
     console.error('Error handling subscription.resumed:', error);
@@ -196,11 +250,13 @@ const handleSubscriptionResumed = async (data) => {
 
 const handleSubscriptionPending = async (data) => {
   try {
+    console.log(`📍 Processing subscription.pending for: ${data.id}`);
+    
     await Subscription.findOneAndUpdate(
       { razorpaySubscriptionId: data.id },
       { status: 'pending' }
     );
-    console.log(`✓ Subscription pending: ${data.id}`);
+    console.log(`✅ Subscription pending: ${data.id}`);
   } catch (error) {
     console.error('Error handling subscription.pending:', error);
   }
@@ -208,6 +264,8 @@ const handleSubscriptionPending = async (data) => {
 
 const handleSubscriptionHalted = async (data) => {
   try {
+    console.log(`📍 Processing subscription.halted for: ${data.id}`);
+    
     const subscription = await Subscription.findOne({ razorpaySubscriptionId: data.id });
     if (!subscription) return;
 
@@ -218,7 +276,7 @@ const handleSubscriptionHalted = async (data) => {
     if (user) {
       user.subscriptionTier = 'free';
       await user.save();
-      console.log(`✓ Subscription halted, user ${user._id} downgraded to free`);
+      console.log(`✅ Subscription halted, user ${user._id} downgraded to free`);
     }
   } catch (error) {
     console.error('Error handling subscription.halted:', error);
@@ -227,6 +285,8 @@ const handleSubscriptionHalted = async (data) => {
 
 const handleSubscriptionCompleted = async (data) => {
   try {
+    console.log(`📍 Processing subscription.completed for: ${data.id}`);
+    
     const subscription = await Subscription.findOne({ razorpaySubscriptionId: data.id });
     if (!subscription) return;
 
@@ -237,7 +297,7 @@ const handleSubscriptionCompleted = async (data) => {
     if (user && user.subscriptionEndDate < new Date()) {
       user.subscriptionTier = 'free';
       await user.save();
-      console.log(`✓ Subscription completed, user ${user._id} downgraded to free`);
+      console.log(`✅ Subscription completed, user ${user._id} downgraded to free`);
     }
   } catch (error) {
     console.error('Error handling subscription.completed:', error);

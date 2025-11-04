@@ -5,12 +5,10 @@ const cors = require("cors");
 const passport = require("./src/config/passport.config");
 require("dotenv").config();
 
-// Import configurations
 const connectDatabase = require("./src/config/database.config");
 const redisClient = require("./src/config/redis.config");
 const { PORT, FRONTEND_URL, NODE_ENV } = require("./src/config/constants");
 
-// Import individual routes
 const authRoutes = require("./src/routes/auth.routes");
 const problemRoutes = require("./src/routes/problem.routes");
 const submissionRoutes = require("./src/routes/submission.routes");
@@ -18,24 +16,24 @@ const aiRoutes = require("./src/routes/ai.routes");
 const videoRoutes = require("./src/routes/video.routes");
 const paymentRoutes = require("./src/routes/payment.routes");
 const { authenticateUser } = require("./src/middleware/auth.middleware");
-const {
-  checkVideoSolutionLimit,
-} = require("./src/middleware/usage.middleware");
+const { checkVideoSolutionLimit } = require("./src/middleware/usage.middleware");
 const usageRouter = require("./src/routes/usage.routes");
 
-// Initialize Express app
 const app = express();
 
 // ========================================
 // MIDDLEWARE CONFIGURATION
 // ========================================
 
-// ✅ UPDATED: Simplified CORS (no credentials needed for localStorage auth)
+// ✅ IMPORTANT: Raw body parser for Razorpay webhook signature verification
+// This MUST come before express.json() for the webhook route
+app.use('/payment/webhook', express.raw({type: 'application/json'}));
+
 app.use(
   cors({
     origin: FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'], // Added Authorization header
+    allowedHeaders: ['Content-Type', 'Authorization'],
     optionsSuccessStatus: 200
   })
 );
@@ -43,7 +41,7 @@ app.use(
 // Body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser()); // Keep for Google OAuth session
+app.use(cookieParser());
 
 // Session configuration (ONLY for Google OAuth)
 app.use(
@@ -64,7 +62,7 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ✅ ADDED: Debug middleware (optional - remove in production)
+// Debug middleware
 app.use((req, res, next) => {
   console.log('🔍 Request:', {
     path: req.path,
@@ -142,26 +140,22 @@ const startServer = async () => {
   }
 };
 
-// Handle uncaught exceptions
 process.on("uncaughtException", (err) => {
   console.error("❌ Uncaught Exception:", err);
   process.exit(1);
 });
 
-// Handle unhandled promise rejections
 process.on("unhandledRejection", (err) => {
   console.error("❌ Unhandled Rejection:", err);
   process.exit(1);
 });
 
-// Graceful shutdown
 process.on("SIGTERM", async () => {
   console.log("⚠️  SIGTERM received, shutting down gracefully...");
   await redisClient.quit();
   process.exit(0);
 });
 
-// Start the server
 startServer();
 
 module.exports = app;
