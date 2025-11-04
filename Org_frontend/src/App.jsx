@@ -110,7 +110,7 @@ function App() {
           }
         />
         
-        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/price" element={<PricingPage />} />
         
         <Route
           path="/profile"
