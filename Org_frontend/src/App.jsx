@@ -54,7 +54,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/verify_email" element={<EmailVerification />} />
+        <Route path="/verify-email" element={<EmailVerification />} />
       </Route>
 
       {/* Main Application Routes */}
