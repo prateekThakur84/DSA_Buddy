@@ -1,8 +1,7 @@
-// src/components/RouteGuards/PrivateRoute.jsx
 import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router';
 
-export default function PrivateRoute({ Component }) {
+export default function PrivateRoute({ children }) {
   const { isAuthenticated, loading } = useSelector((state) => state.auth);
 
   if (loading) return (
@@ -11,5 +10,5 @@ export default function PrivateRoute({ Component }) {
     </div>
   );
 
-  return isAuthenticated ? <Component /> : <Navigate to="/login" />;
+  return isAuthenticated ? children : <Navigate to="/login" />;
 }
