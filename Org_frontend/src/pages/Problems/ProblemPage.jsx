@@ -2,10 +2,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import LeftPanel from "../../components/ProblemSolve/LeftPanel.jsx";
 import RightPanel from "../../components/ProblemSolve/RightPanel.jsx";
-// hello
 
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
-
 import ResizableHandle from "../../components/ProblemSolve/ResizableHandle.jsx";
 
 import {
@@ -24,7 +22,8 @@ import { useParams } from "react-router";
 import { useEffect, useState } from "react";
 
 const ProblemPage = () => {
-  const { problemId } = useParams();
+  // ✅ FIX: Get 'id' from route params (matches /problem/:id)
+  const { id: problemId } = useParams();
   const dispatch = useDispatch();
 
   // Redux state
@@ -52,9 +51,9 @@ const ProblemPage = () => {
   // Fetch problem and submissions on mount or when problemId changes
   useEffect(() => {
     if (problemId) {
-      dispatch(setCurrentProblem(problemId)); // Try to load from cache first
-      dispatch(fetchProblemById(problemId)); // Fetch if not cached
-      dispatch(fetchSubmissions(problemId)); // Fetch submissions if not cached
+      dispatch(setCurrentProblem(problemId));
+      dispatch(fetchProblemById(problemId));
+      dispatch(fetchSubmissions(problemId));
     }
   }, [problemId, dispatch]);
 
