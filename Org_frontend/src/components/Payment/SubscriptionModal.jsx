@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { X, Check, Crown } from 'lucide-react';
-import { fetchPlans, fetchPaymentPages } from '../../store/slices/subscriptionSlice';
+import { fetchPlans, fetchPaymentPages, createSubscription } from '../../store/slices/subscriptionSlice';
+import axiosClient from '../../utils/axiosClient';
 
 const SubscriptionModal = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
-  const { plans, paymentPages, error } = useSelector((state) => state.subscription);
+  const { plans, paymentPages, error, paymentLoading } = useSelector((state) => state.subscription);
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [loading, setLoading] = useState(false);
 
@@ -16,31 +17,78 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen, dispatch]);
 
-  // ✅ Redirect to Razorpay hosted payment page
+  // ✅ UPDATED: Create subscription first, then open Razorpay
   const handleSubscribe = async () => {
     try {
       setLoading(true);
+      console.log('📍 Step 1: Creating subscription on backend...');
 
-      // Optional: Log attempt to backend
-      await fetch('/api/payment/log-payment-attempt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planType: selectedPlan })
-      }).catch(() => null);
+      // Step 1: Create subscription on backend
+      const subscriptionResponse = await axiosClient.post('/payment/create-subscription', {
+        planType: selectedPlan
+      });
 
-      const paymentLink =
-        selectedPlan === 'monthly'
-          ? paymentPages?.monthly
-          : paymentPages?.yearly;
+      console.log('✅ Subscription created:', subscriptionResponse.data);
 
-      if (paymentLink) {
-        window.open(paymentLink, '_blank');
-      } else {
-        alert('Payment page not available. Please try again.');
-      }
+      const {
+        subscription: { subscriptionId, razorpayKeyId },
+      } = subscriptionResponse.data;
+
+      console.log('📍 Step 2: Opening Razorpay checkout...');
+
+      // Step 2: Open Razorpay checkout (not hosted page)
+      const options = {
+        key: razorpayKeyId,
+        subscription_id: subscriptionId,
+        name: 'DSA Buddy',
+        description: `${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Premium Plan`,
+        image: '/logo.png', // Your logo URL
+        theme: {
+          color: '#00d4ff'
+        },
+        handler: async function(response) {
+          console.log('✅ Payment successful:', response);
+
+          // Step 3: Verify payment
+          try {
+            const verifyResponse = await axiosClient.post('/payment/verify-payment', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_signature: response.razorpay_signature
+            });
+
+            console.log('✅ Payment verified:', verifyResponse.data);
+
+            // Payment successful
+            alert('🎉 Payment successful! You are now a premium member!');
+            onClose();
+            
+            // Refresh subscription status
+            window.location.reload();
+          } catch (verifyError) {
+            console.error('❌ Payment verification failed:', verifyError);
+            alert('Payment verification failed. Please contact support.');
+          }
+        },
+        modal: {
+          ondismiss: function() {
+            console.log('⚠️ Payment checkout closed by user');
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      
+      // Handle payment error
+      rzp.on('payment.failed', function(response) {
+        console.error('❌ Payment failed:', response.error);
+        alert('Payment failed: ' + response.error.description);
+      });
+
+      rzp.open();
     } catch (error) {
-      console.error('Error redirecting:', error);
-      alert('Failed to redirect to payment page.');
+      console.error('❌ Error during subscription:', error);
+      alert(error.response?.data?.message || 'Failed to create subscription. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -64,7 +112,7 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
           <button 
             onClick={onClose} 
             className="text-slate-400 hover:text-white transition-colors p-1 flex-shrink-0"
-            disabled={loading}
+            disabled={loading || paymentLoading}
           >
             <X size={18} />
           </button>
@@ -81,7 +129,7 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
                     ? 'border-cyan-400/60 bg-cyan-500/5 shadow-lg shadow-cyan-500/10'
                     : 'border-slate-700 hover:border-slate-600 bg-slate-900/50'
                 }`}
-                onClick={() => setSelectedPlan(plan.type)}
+                onClick={() => !loading && !paymentLoading && setSelectedPlan(plan.type)}
               >
                 {/* Recommended Badge */}
                 {plan.recommended && (
@@ -144,20 +192,20 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
           <div className="flex flex-col sm:flex-row justify-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-300 border border-slate-600 rounded-md hover:border-slate-500 hover:bg-slate-800/30 transition-all"
-              disabled={loading}
+              className="px-4 py-2 text-xs font-semibold text-slate-300 border border-slate-600 rounded-md hover:border-slate-500 hover:bg-slate-800/30 transition-all disabled:opacity-50"
+              disabled={loading || paymentLoading}
             >
               Maybe Later
             </button>
             <button
               onClick={handleSubscribe}
-              className="px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-500 rounded-md hover:from-cyan-400 hover:to-blue-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20"
-              disabled={loading}
+              className="px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-500 rounded-md hover:from-cyan-400 hover:to-blue-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+              disabled={loading || paymentLoading}
             >
-              {loading ? (
+              {loading || paymentLoading ? (
                 <>
                   <div className="animate-spin">⚙️</div>
-                  Redirecting...
+                  Processing...
                 </>
               ) : (
                 <>

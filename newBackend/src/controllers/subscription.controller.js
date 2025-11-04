@@ -54,10 +54,18 @@ const getPlans = async (req, res) => {
 
 const createSubscription = async (req, res) => {
   try {
+    console.log('🔴 ===== CREATE SUBSCRIPTION CALLED =====');
+    console.log('Request received at:', new Date().toISOString());
+    console.log('User ID:', req.user?._id);
+    console.log('User email:', req.user?.emailId);
+    console.log('Request body:', req.body);
+    console.log('Plan type:', req.body.planType);
+    
     const { planType } = req.body;
-    const userId = req.user.id;
+    const userId = req.user._id; // Use _id, not id
 
     if (!['monthly', 'yearly'].includes(planType)) {
+      console.log('❌ Invalid plan type:', planType);
       return res.status(400).json({
         success: false,
         message: 'Invalid plan type. Choose monthly or yearly.'
@@ -67,13 +75,17 @@ const createSubscription = async (req, res) => {
     const user = await User.findById(userId);
     
     if (!user) {
+      console.log('❌ User not found:', userId);
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
 
+    console.log('✅ User found:', user.emailId);
+
     if (user.isPremiumActive()) {
+      console.log('⚠️ User already has active subscription');
       return res.status(400).json({
         success: false,
         message: 'You already have an active subscription',
@@ -85,22 +97,13 @@ const createSubscription = async (req, res) => {
     }
 
     const plan = SUBSCRIPTION_PLANS[planType];
-
-    // console.log('Plan ID being used:', plan.planId);
-
-      // ✅ DEBUG LOGS - Add these to verify
-    console.log('============================================');
-    console.log('📋 SUBSCRIPTION CREATION DEBUG');
-    console.log('Plan Type:', planType);
-    console.log('Plan Object:', plan);
-    console.log('Plan ID:', plan.planId);
-    console.log('Amount (paise):', plan.amount);
-    console.log('Amount (₹):', plan.amount / 100);
-    console.log('============================================');
+    
+    console.log('📋 Using plan:', { planType, planId: plan.planId, amount: plan.amount });
 
     let customerId = user.razorpayCustomerId;
     
     if (!customerId) {
+      console.log('📝 Creating new Razorpay customer...');
       const customer = await razorpayInstance.customers.create({
         name: `${user.firstName} ${user.lastName || ''}`.trim(),
         email: user.emailId,
@@ -115,7 +118,7 @@ const createSubscription = async (req, res) => {
       user.razorpayCustomerId = customerId;
       await user.save();
       
-      console.log(`Created Razorpay customer: ${customerId} for user: ${userId}`);
+      console.log('✅ Razorpay customer created:', customerId);
     }
 
     const subscriptionData = {
@@ -132,13 +135,11 @@ const createSubscription = async (req, res) => {
       }
     };
 
+    console.log('📤 Creating Razorpay subscription with data:', subscriptionData);
+    
     const subscription = await razorpayInstance.subscriptions.create(subscriptionData);
 
-     console.log('✅ Razorpay Response:', {
-      id: subscription.id,
-      plan_id: subscription.plan_id,
-      amount: subscription.notes?.amount || plan.amount
-    });
+    console.log('✅ Razorpay subscription created:', subscription.id);
 
     const newSubscription = await Subscription.create({
       userId: userId,
@@ -153,7 +154,7 @@ const createSubscription = async (req, res) => {
       razorpayData: subscription
     });
 
-    console.log(`Subscription created: ${subscription.id} for user: ${userId}`);
+    console.log('✅ Subscription saved to DB:', newSubscription._id);
 
     res.status(201).json({
       success: true,
@@ -168,7 +169,8 @@ const createSubscription = async (req, res) => {
       razorpayKeyId: process.env.RAZORPAY_KEY_ID
     });
   } catch (error) {
-    console.error('Create subscription error:', error);
+    console.error('❌ Create subscription error:', error);
+    console.error('Error details:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to create subscription',
@@ -176,6 +178,7 @@ const createSubscription = async (req, res) => {
     });
   }
 };
+
 
 const verifyPayment = async (req, res) => {
   try {
