@@ -58,8 +58,6 @@ const createSubscription = async (req, res) => {
     console.log('Request received at:', new Date().toISOString());
     console.log('User ID:', req.user?._id);
     console.log('User email:', req.user?.emailId);
-    console.log('Request body:', req.body);
-    console.log('Plan type:', req.body.planType);
 
     const { planType } = req.body;
     const userId = req.user._id;
@@ -97,33 +95,59 @@ const createSubscription = async (req, res) => {
     }
 
     const plan = SUBSCRIPTION_PLANS[planType];
-
     console.log('📋 Using plan:', { planType, planId: plan.planId, amount: plan.amount });
 
+    // ✅ IMPROVED: Get or create Razorpay customer with proper error handling
     let customerId = user.razorpayCustomerId;
-    
+
     if (!customerId) {
       try {
         console.log('📝 Creating/Fetching Razorpay customer...');
-        // ✅ FIXED: Use fail_existing: 1 to reuse existing customer instead of failing
-        const customer = await razorpayInstance.customers.create({
-          name: `${user.firstName} ${user.lastName || ''}`.trim(),
-          email: user.emailId,
-          fail_existing: 1, // ✅ CHANGED FROM 0 TO 1
-          notes: {
-            userId: userId.toString(),
-            platform: 'DSA Buddy'
+        
+        try {
+          // Try to create customer
+          const customer = await razorpayInstance.customers.create({
+            name: `${user.firstName} ${user.lastName || ''}`.trim(),
+            email: user.emailId,
+            notes: {
+              userId: userId.toString(),
+              platform: 'DSA Buddy'
+            }
+          });
+          
+          customerId = customer.id;
+          console.log('✅ New Razorpay customer created:', customerId);
+        } catch (createError) {
+          // If customer already exists, fetch it by email
+          if (createError.statusCode === 400 && createError.error?.description?.includes('already exists')) {
+            console.log('📝 Customer exists in Razorpay, fetching by email...');
+            
+            // Search for existing customer by email
+            const customers = await razorpayInstance.customers.all({
+              email: user.emailId
+            });
+            
+            if (customers.items && customers.items.length > 0) {
+              customerId = customers.items[0].id;
+              console.log('✅ Existing Razorpay customer found:', customerId);
+            } else {
+              throw new Error('Could not find or create customer');
+            }
+          } else {
+            throw createError;
           }
-        });
+        }
         
-        customerId = customer.id;
-        user.razorpayCustomerId = customerId;
-        await user.save();
+        // Save customer ID to user profile
+        if (customerId) {
+          user.razorpayCustomerId = customerId;
+          await user.save();
+          console.log('✅ Customer ID saved to user profile:', customerId);
+        }
         
-        console.log('✅ Razorpay customer created/reused:', customerId);
       } catch (customerError) {
-        console.error('❌ Failed to create/fetch Razorpay customer:', customerError.message);
-        console.error('Full customer error:', customerError);
+        console.error('❌ Failed to get Razorpay customer:', customerError.message);
+        console.error('Full error:', customerError);
         return res.status(500).json({
           success: false,
           message: 'Failed to create customer profile',
@@ -134,6 +158,7 @@ const createSubscription = async (req, res) => {
       console.log('✅ Using existing Razorpay customer:', customerId);
     }
 
+    // Create subscription on Razorpay
     const subscriptionData = {
       plan_id: plan.planId,
       customer_id: customerId,
@@ -148,7 +173,7 @@ const createSubscription = async (req, res) => {
       }
     };
 
-    console.log('📤 Creating Razorpay subscription with data:', JSON.stringify(subscriptionData, null, 2));
+    console.log('📤 Creating Razorpay subscription...');
     
     let subscription;
     try {
@@ -156,14 +181,14 @@ const createSubscription = async (req, res) => {
       console.log('✅ Razorpay subscription created:', subscription.id);
     } catch (razorpayError) {
       console.error('❌ Failed to create Razorpay subscription:', razorpayError.message);
-      console.error('Razorpay error details:', razorpayError);
       return res.status(500).json({
         success: false,
-        message: 'Failed to create subscription on payment gateway',
+        message: 'Failed to create subscription',
         error: razorpayError.message
       });
     }
 
+    // Save subscription to database
     try {
       console.log('📝 Saving subscription to database...');
       const newSubscription = await Subscription.create({
@@ -203,11 +228,7 @@ const createSubscription = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('❌ ===== UNEXPECTED ERROR IN CREATE SUBSCRIPTION =====');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
+    console.error('❌ Unexpected error in createSubscription:', error.message);
     res.status(500).json({
       success: false,
       message: 'Failed to create subscription',
@@ -215,6 +236,7 @@ const createSubscription = async (req, res) => {
     });
   }
 };
+
 
 const verifyPayment = async (req, res) => {
   try {
