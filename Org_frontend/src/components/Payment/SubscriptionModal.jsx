@@ -18,13 +18,13 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen, dispatch]);
 
-  // ✅ UPDATED WITH FULL DEBUGGING
+  // ✅ FIXED: Properly extract response data
   const handleSubscribe = async () => {
     try {
       console.log('🔴 ========== SUBSCRIBE BUTTON CLICKED ==========');
       setLoading(true);
 
-      // Step 1: Check token
+      // Check token
       const token = localStorage.getItem('authToken');
       console.log('🔐 Token exists:', !!token);
       if (!token) {
@@ -42,11 +42,16 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
 
       console.log('✅ Step 1 SUCCESS - Subscription created:', subscriptionResponse.data);
 
-      const {
-        subscription: { subscriptionId, razorpayKeyId },
-      } = subscriptionResponse.data;
+      // ✅ FIXED: Extract from correct location
+      const subscriptionId = subscriptionResponse.data.subscription.subscriptionId;
+      const razorpayKeyId = subscriptionResponse.data.razorpayKeyId;
 
       if (!subscriptionId || !razorpayKeyId) {
+        console.error('❌ Missing data in response:', {
+          subscriptionId,
+          razorpayKeyId,
+          fullResponse: subscriptionResponse.data
+        });
         throw new Error('Missing subscription ID or Razorpay key from response');
       }
 
