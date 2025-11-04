@@ -26,8 +26,8 @@ import About from "./pages/Public/About";
 
 // Main Pages
 import Homepage from "./pages/Dashboard/Homepage";
-import ProblemsPage from "./pages/Problems/Problems";
-import ProblemDetailPage from "./pages/Problems/ProblemPage";
+import Problems from "./pages/Problems/Problems";
+import ProblemPage from "./pages/Problems/ProblemPage";
 import ContestsPage from "./pages/Contests/Contests";
 import DiscussPage from "./pages/Discuss/Discuss";
 import UserProfile from "./pages/Profile/UserProfile";
@@ -78,7 +78,7 @@ function App() {
           path="/problems"
           element={
             <PrivateRoute>
-              <ProblemsPage />
+              <Problems />
             </PrivateRoute>
           }
         />
@@ -87,7 +87,7 @@ function App() {
           path="/problem/:id"
           element={
             <PrivateRoute>
-              <ProblemDetailPage />
+              <ProblemPage />
             </PrivateRoute>
           }
         />
