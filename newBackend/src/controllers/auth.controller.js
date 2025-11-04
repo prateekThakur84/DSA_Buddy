@@ -136,8 +136,8 @@ const verifyEmail = async (req, res) => {
   maxAge: 24 * 60 * 60 * 1000,
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'none',
-  domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
+  sameSite: 'lax',
+  // domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost'
 });
 
 res.json({

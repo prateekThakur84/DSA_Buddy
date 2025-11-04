@@ -30,13 +30,25 @@ const app = express();
 // MIDDLEWARE CONFIGURATION
 // ========================================
 
-// CORS configuration
+// // CORS configuration
+// app.use(
+//   cors({
+//     origin: FRONTEND_URL,
+//     credentials: true,
+//   })
+// );
+
+
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: FRONTEND_URL, // Make sure FRONTEND_URL includes 'https://'
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 200 // For legacy browser support
   })
 );
+
 
 // Body parser middleware
 app.use(express.json());
