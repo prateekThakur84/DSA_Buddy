@@ -29,14 +29,31 @@ const app = express();
 // This MUST come before express.json() for the webhook route
 app.use('/payment/webhook', express.raw({type: 'application/json'}));
 
+const allowedOrigins = [
+  'https://dsa-buddy-frontend.onrender.com', // Frontend (Render)
+  'http://localhost:5173',                   // Local development
+];
+
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.error('❌ CORS blocked for origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true, // Required if sending cookies or auth headers
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    optionsSuccessStatus: 200
   })
 );
+
+// Handle preflight requests
+app.options('*', cors());
+
 
 // Body parser middleware
 app.use(express.json());
