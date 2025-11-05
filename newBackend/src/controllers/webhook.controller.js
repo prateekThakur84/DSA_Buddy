@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const User = require('../models/user.model');
 const Subscription = require('../models/subscription.model');
 
-// ✅ Verify webhook signature
 const verifyWebhookSignature = (body, signature) => {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   
@@ -18,14 +17,9 @@ const verifyWebhookSignature = (body, signature) => {
     .update(bodyString)
     .digest('hex');
   
-  console.log('🔐 Webhook signature verification:', {
-    match: generatedSignature === signature
-  });
-  
   return generatedSignature === signature;
 };
 
-// ✅ MAIN WEBHOOK HANDLER (FIXED)
 const handleSubscriptionWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-razorpay-signature'];
@@ -33,39 +27,45 @@ const handleSubscriptionWebhook = async (req, res) => {
     console.log('🔔 Webhook received');
     
     if (!signature) {
-      console.error('❌ No signature in webhook request');
-      return res.status(400).json({ success: false, message: 'Missing signature' });
+      console.error('❌ No signature');
+      return res.status(400).json({ success: false });
     }
 
-    // ✅ Get body for verification
-    let bodyToVerify = req.body;
+    // ✅ CRITICAL FIX: Convert Buffer to string for verification
+    let bodyString = req.body;
     if (Buffer.isBuffer(req.body)) {
-      bodyToVerify = req.body.toString('utf8');
+      bodyString = req.body.toString('utf8');
+      console.log('✅ Converted Buffer to string');
     }
 
-    // ✅ Verify signature
-    if (!verifyWebhookSignature(bodyToVerify, signature)) {
-      console.error('❌ Invalid webhook signature');
-      return res.status(400).json({ success: false, message: 'Invalid signature' });
-    }
-
-    // ✅ Parse body
-    let body = req.body;
-    if (typeof body === 'string') {
-      body = JSON.parse(body);
+    // ✅ Verify signature with string
+    if (!verifyWebhookSignature(bodyString, signature)) {
+      console.error('❌ Invalid signature');
+      return res.status(400).json({ success: false });
     }
 
     console.log('✅ Webhook verified');
-    
-    // ✅ FIXED: Extract event correctly
+
+    // ✅ CRITICAL FIX: Parse the body AFTER verification
+    let body;
+    if (typeof bodyString === 'string') {
+      body = JSON.parse(bodyString);
+      console.log('✅ Parsed body from string');
+    } else {
+      body = req.body;
+    }
+
+    // ✅ Log full body for debugging
+    console.log('📋 Full webhook body:', JSON.stringify(body, null, 2));
+
+    // ✅ Extract event and subscription data
     const event = body.event;
-    console.log('Event type:', event);
-    
-    // ✅ FIXED: Extract entity from correct location
+    console.log('📍 Event type:', event);
+
     let subscriptionData = null;
     let paymentData = null;
 
-    // Try different payload structures
+    // ✅ Handle different event structures from Razorpay
     if (body.payload?.subscription?.entity) {
       subscriptionData = body.payload.subscription.entity;
       console.log('✅ Found subscription in payload.subscription.entity');
@@ -79,61 +79,72 @@ const handleSubscriptionWebhook = async (req, res) => {
     }
 
     console.log('Subscription ID:', subscriptionData?.id);
-    console.log('Event:', event);
 
-    // ✅ Handle different event types
+    // ✅ Handle events
+    if (!event) {
+      console.error('❌ Event is undefined, but webhook body is:', body);
+      return res.status(200).json({ success: true });
+    }
+
     switch (event) {
+      case 'subscription.authenticated':
+        console.log('🔵 Processing: subscription.authenticated');
+        if (subscriptionData) {
+          await handleSubscriptionActivated(subscriptionData);
+        }
+        break;
+
       case 'subscription.activated':
-        console.log('📍 Processing: subscription.activated');
+        console.log('🔵 Processing: subscription.activated');
         if (subscriptionData) {
           await handleSubscriptionActivated(subscriptionData);
         }
         break;
 
       case 'subscription.charged':
-        console.log('📍 Processing: subscription.charged');
+        console.log('🔵 Processing: subscription.charged');
         if (subscriptionData) {
           await handleSubscriptionCharged(subscriptionData, paymentData);
         }
         break;
 
       case 'subscription.cancelled':
-        console.log('📍 Processing: subscription.cancelled');
+        console.log('🔵 Processing: subscription.cancelled');
         if (subscriptionData) {
           await handleSubscriptionCancelled(subscriptionData);
         }
         break;
 
       case 'subscription.paused':
-        console.log('📍 Processing: subscription.paused');
+        console.log('🔵 Processing: subscription.paused');
         if (subscriptionData) {
           await handleSubscriptionPaused(subscriptionData);
         }
         break;
 
       case 'subscription.resumed':
-        console.log('📍 Processing: subscription.resumed');
+        console.log('🔵 Processing: subscription.resumed');
         if (subscriptionData) {
           await handleSubscriptionResumed(subscriptionData);
         }
         break;
 
       case 'subscription.pending':
-        console.log('📍 Processing: subscription.pending');
+        console.log('🔵 Processing: subscription.pending');
         if (subscriptionData) {
           await handleSubscriptionPending(subscriptionData);
         }
         break;
 
       case 'subscription.halted':
-        console.log('📍 Processing: subscription.halted');
+        console.log('🔵 Processing: subscription.halted');
         if (subscriptionData) {
           await handleSubscriptionHalted(subscriptionData);
         }
         break;
 
       case 'subscription.completed':
-        console.log('📍 Processing: subscription.completed');
+        console.log('🔵 Processing: subscription.completed');
         if (subscriptionData) {
           await handleSubscriptionCompleted(subscriptionData);
         }
@@ -147,20 +158,18 @@ const handleSubscriptionWebhook = async (req, res) => {
         console.log(`⚠️ Unhandled webhook event: ${event}`);
     }
 
-    // ✅ Always return 200 to acknowledge receipt
-    res.status(200).json({ success: true, message: 'Webhook processed' });
+    res.status(200).json({ success: true });
 
   } catch (error) {
-    console.error('❌ Webhook processing error:', error);
-    // Return 200 even on error to prevent Razorpay retries
-    res.status(200).json({ success: false, message: 'Webhook processing failed' });
+    console.error('❌ Webhook error:', error);
+    res.status(200).json({ success: true });
   }
 };
 
-// ✅ SUBSCRIPTION ACTIVATED
+// ✅ SUBSCRIPTION ACTIVATED/AUTHENTICATED
 const handleSubscriptionActivated = async (data) => {
   try {
-    console.log('🔵 ===== SUBSCRIPTION ACTIVATED =====');
+    console.log('🔵 ===== HANDLING SUBSCRIPTION ACTIVATED/AUTHENTICATED =====');
     console.log('Subscription ID:', data.id);
 
     const subscription = await Subscription.findOne({ 
@@ -174,7 +183,6 @@ const handleSubscriptionActivated = async (data) => {
 
     console.log('✅ Subscription found in DB');
 
-    // ✅ Update subscription
     subscription.status = 'active';
     subscription.startDate = new Date(data.start_at * 1000);
     subscription.endDate = new Date(data.end_at * 1000);
@@ -186,7 +194,6 @@ const handleSubscriptionActivated = async (data) => {
     await subscription.save();
     console.log('✅ Subscription updated in DB');
 
-    // ✅ Update user
     const user = await User.findById(subscription.userId);
     if (user) {
       user.subscriptionTier = 'premium';
@@ -195,8 +202,8 @@ const handleSubscriptionActivated = async (data) => {
       user.razorpaySubscriptionId = data.id;
       
       await user.save();
-      console.log(`✅ User ${user._id} updated to premium`);
-      console.log(`✅ Premium valid until: ${subscription.endDate}`);
+      console.log(`✅ User ${user._id} updated to PREMIUM`);
+      console.log(`✅ Valid until: ${subscription.endDate}`);
     }
 
   } catch (error) {
@@ -207,7 +214,7 @@ const handleSubscriptionActivated = async (data) => {
 // ✅ SUBSCRIPTION CHARGED (Renewal)
 const handleSubscriptionCharged = async (subscriptionData, paymentData) => {
   try {
-    console.log('🔵 ===== SUBSCRIPTION CHARGED (RENEWAL) =====');
+    console.log('🔵 ===== SUBSCRIPTION CHARGED =====');
     console.log('Subscription ID:', subscriptionData.id);
 
     const subscription = await Subscription.findOne({ 
@@ -219,16 +226,14 @@ const handleSubscriptionCharged = async (subscriptionData, paymentData) => {
       return;
     }
 
-    // ✅ Update subscription with new cycle info
     subscription.paidCount = subscriptionData.paid_count;
     subscription.currentEnd = new Date(subscriptionData.current_end * 1000);
     subscription.nextBillingDate = subscriptionData.charge_at ? 
       new Date(subscriptionData.charge_at * 1000) : null;
     
     await subscription.save();
-    console.log('✅ Subscription renewed in DB');
+    console.log('✅ Subscription renewed');
 
-    // ✅ Update user with new end date
     const user = await User.findById(subscription.userId);
     if (user) {
       user.subscriptionEndDate = new Date(subscriptionData.current_end * 1000);
@@ -246,7 +251,7 @@ const handleSubscriptionCharged = async (subscriptionData, paymentData) => {
       }
       
       await user.save();
-      console.log(`✅ User ${user._id} subscription renewed until ${user.subscriptionEndDate}`);
+      console.log(`✅ User renewed until: ${user.subscriptionEndDate}`);
     }
 
   } catch (error) {
@@ -263,20 +268,13 @@ const handleSubscriptionCancelled = async (data) => {
       razorpaySubscriptionId: data.id 
     });
 
-    if (!subscription) {
-      console.error(`❌ Subscription not found: ${data.id}`);
-      return;
-    }
+    if (!subscription) return;
 
     subscription.status = 'cancelled';
     subscription.cancelledAt = new Date();
     await subscription.save();
 
-    const user = await User.findById(subscription.userId);
-    if (user) {
-      console.log(`✅ Subscription cancelled for user ${user._id}`);
-      console.log(`✅ User will remain premium until: ${user.subscriptionEndDate}`);
-    }
+    console.log(`✅ Subscription cancelled`);
 
   } catch (error) {
     console.error('❌ Error in handleSubscriptionCancelled:', error);
@@ -301,7 +299,7 @@ const handleSubscriptionPaused = async (data) => {
     if (user) {
       user.subscriptionTier = 'free';
       await user.save();
-      console.log(`✅ User ${user._id} paused - downgraded to free`);
+      console.log(`✅ User downgraded to FREE`);
     }
 
   } catch (error) {
@@ -329,7 +327,7 @@ const handleSubscriptionResumed = async (data) => {
       user.subscriptionTier = 'premium';
       user.subscriptionEndDate = subscription.endDate;
       await user.save();
-      console.log(`✅ User ${user._id} resumed - upgraded to premium`);
+      console.log(`✅ User upgraded to PREMIUM`);
     }
 
   } catch (error) {
@@ -347,7 +345,7 @@ const handleSubscriptionPending = async (data) => {
       { status: 'pending' }
     );
 
-    console.log(`✅ Subscription ${data.id} marked as pending`);
+    console.log(`✅ Subscription pending`);
 
   } catch (error) {
     console.error('❌ Error in handleSubscriptionPending:', error);
@@ -372,7 +370,7 @@ const handleSubscriptionHalted = async (data) => {
     if (user) {
       user.subscriptionTier = 'free';
       await user.save();
-      console.log(`✅ User ${user._id} halted - downgraded to free`);
+      console.log(`✅ User downgraded to FREE`);
     }
 
   } catch (error) {
@@ -398,7 +396,7 @@ const handleSubscriptionCompleted = async (data) => {
     if (user && user.subscriptionEndDate < new Date()) {
       user.subscriptionTier = 'free';
       await user.save();
-      console.log(`✅ Subscription completed - user ${user._id} downgraded to free`);
+      console.log(`✅ User downgraded to FREE`);
     }
 
   } catch (error) {
