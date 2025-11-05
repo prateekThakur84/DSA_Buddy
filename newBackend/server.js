@@ -25,10 +25,7 @@ const app = express();
 // MIDDLEWARE CONFIGURATION
 // ========================================
 
-// ✅ IMPORTANT: Raw body parser for Razorpay webhook signature verification
-// This MUST come before express.json() for the webhook route
-app.use('/payment/webhook', express.raw({type: 'application/json'}));
-
+// ✅ CRITICAL: CORS FIRST (before any body parsing)
 app.use(
   cors({
     origin: FRONTEND_URL,
@@ -38,7 +35,11 @@ app.use(
   })
 );
 
-// Body parser middleware
+// ✅ CRITICAL FIX: Raw body parser for WEBHOOK MUST come BEFORE express.json()
+// ✅ This captures the raw body for signature verification
+app.use('/payment/webhook', express.raw({ type: 'application/json' }));
+
+// ✅ CRITICAL: Body parser for all OTHER routes (after webhook middleware)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -64,6 +65,15 @@ app.use(passport.session());
 
 // Debug middleware
 app.use((req, res, next) => {
+  // ✅ Log webhook body for debugging
+  if (req.path === '/payment/webhook') {
+    console.log('🔔 Webhook DEBUG:');
+    console.log('  Body type:', typeof req.body);
+    console.log('  Body is Buffer:', Buffer.isBuffer(req.body));
+    console.log('  Body length:', req.body?.length || 'N/A');
+    console.log('  Body preview:', Buffer.isBuffer(req.body) ? req.body.toString('utf8').substring(0, 100) : JSON.stringify(req.body).substring(0, 100));
+  }
+  
   console.log('🔍 Request:', {
     path: req.path,
     method: req.method,
