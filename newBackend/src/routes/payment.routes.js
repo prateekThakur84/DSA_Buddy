@@ -10,9 +10,18 @@ const {
 } = require('../controllers/subscription.controller');
 const { handleSubscriptionWebhook } = require('../controllers/webhook.controller');
 
-// Public routes - NO authentication
+// ✅ IMPORTANT: Webhook must NOT require authentication
 paymentRouter.post('/webhook', handleSubscriptionWebhook);
+
+// Public routes
 paymentRouter.get('/plans', getPlans);
+
+// Protected routes
+paymentRouter.post('/create-subscription', authenticateUser, createSubscription);
+paymentRouter.post('/verify-payment', authenticateUser, verifyPayment);
+paymentRouter.get('/subscription-status', authenticateUser, getSubscriptionStatus);
+paymentRouter.post('/cancel-subscription', authenticateUser, cancelSubscription);
+
 paymentRouter.get('/payment-pages', (req, res) => {
   try {
     res.json({
@@ -27,10 +36,17 @@ paymentRouter.get('/payment-pages', (req, res) => {
   }
 });
 
-// Protected routes - REQUIRES authentication
-paymentRouter.post('/create-subscription', authenticateUser, createSubscription);
-paymentRouter.post('/verify-payment', authenticateUser, verifyPayment);
-paymentRouter.get('/subscription-status', authenticateUser, getSubscriptionStatus);
-paymentRouter.post('/cancel-subscription', authenticateUser, cancelSubscription);
+paymentRouter.post('/log-payment-attempt', authenticateUser, async (req, res) => {
+  try {
+    const { planType } = req.body;
+    const userId = req.user.id;
+    
+    console.log(`📊 User ${userId} clicked payment link for ${planType} plan`);
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false });
+  }
+});
 
 module.exports = paymentRouter;

@@ -1,42 +1,132 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { X, Check, Crown, ArrowRight } from 'lucide-react';
+import { X, Check, Crown } from 'lucide-react';
 import { fetchPlans, fetchPaymentPages } from '../../store/slices/subscriptionSlice';
+import axiosClient from '../../utils/axiosClient';
 
 const SubscriptionModal = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
-  const { plans, paymentPages } = useSelector((state) => state.subscription);
+  const { plans, paymentPages, error, paymentLoading } = useSelector((state) => state.subscription);
   const [selectedPlan, setSelectedPlan] = useState('monthly');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      console.log('🎯 SubscriptionModal opened');
       dispatch(fetchPlans());
       dispatch(fetchPaymentPages());
     }
   }, [isOpen, dispatch]);
 
+  // ✅ FIXED: Properly extract response data
   const handleSubscribe = async () => {
     try {
+      console.log('🔴 ========== SUBSCRIBE BUTTON CLICKED ==========');
       setLoading(true);
-      console.log('🔴 Opening Razorpay payment page...');
 
-      const paymentLink = 
-        selectedPlan === 'monthly'
-          ? paymentPages?.monthly
-          : paymentPages?.yearly;
-
-      if (!paymentLink) {
-        alert('Payment page not available. Please try again.');
-        return;
+      // Check token
+      const token = localStorage.getItem('authToken');
+      console.log('🔐 Token exists:', !!token);
+      if (!token) {
+        throw new Error('No authentication token found');
       }
 
-      console.log('🌐 Redirecting to payment page:', paymentLink);
-      window.location.href = paymentLink;
-      
+      console.log('📍 Step 1: Creating subscription on backend...');
+      console.log('Sending request to: /payment/create-subscription');
+      console.log('Plan type:', selectedPlan);
+
+      // Step 1: Create subscription on backend
+      const subscriptionResponse = await axiosClient.post('/payment/create-subscription', {
+        planType: selectedPlan
+      });
+
+      console.log('✅ Step 1 SUCCESS - Subscription created:', subscriptionResponse.data);
+
+      // ✅ FIXED: Extract from correct location
+      const subscriptionId = subscriptionResponse.data.subscription.subscriptionId;
+      const razorpayKeyId = subscriptionResponse.data.razorpayKeyId;
+
+      if (!subscriptionId || !razorpayKeyId) {
+        console.error('❌ Missing data in response:', {
+          subscriptionId,
+          razorpayKeyId,
+          fullResponse: subscriptionResponse.data
+        });
+        throw new Error('Missing subscription ID or Razorpay key from response');
+      }
+
+      console.log('📍 Step 2: Opening Razorpay checkout...');
+      console.log('Subscription ID:', subscriptionId);
+      console.log('Razorpay Key:', razorpayKeyId);
+
+      // Check if Razorpay is loaded
+      if (!window.Razorpay) {
+        throw new Error('Razorpay script not loaded! Make sure to include the script in your HTML');
+      }
+
+      // Step 2: Open Razorpay checkout
+      const options = {
+        key: razorpayKeyId,
+        subscription_id: subscriptionId,
+        name: 'DSA Buddy',
+        description: `${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Premium Plan`,
+        image: '/logo.png',
+        theme: {
+          color: '#00d4ff'
+        },
+        handler: async function(response) {
+          console.log('✅ Step 2 SUCCESS - Payment successful');
+          console.log('Payment response:', response);
+
+          // Step 3: Verify payment
+          try {
+            console.log('📍 Step 3: Verifying payment on backend...');
+            
+            const verifyResponse = await axiosClient.post('/payment/verify-payment', {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_signature: response.razorpay_signature
+            });
+
+            console.log('✅ Step 3 SUCCESS - Payment verified:', verifyResponse.data);
+
+            alert('🎉 Payment successful! You are now a premium member!');
+            onClose();
+            window.location.reload();
+          } catch (verifyError) {
+            console.error('❌ Step 3 FAILED - Payment verification error:', verifyError);
+            console.error('Error response:', verifyError.response?.data);
+            console.error('Error message:', verifyError.message);
+            alert('Payment verification failed: ' + (verifyError.response?.data?.message || verifyError.message));
+          }
+        },
+        modal: {
+          ondismiss: function() {
+            console.log('⚠️ User closed Razorpay modal');
+            setLoading(false);
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      // Handle payment error
+      rzp.on('payment.failed', function(response) {
+        console.error('❌ Razorpay payment failed:', response.error);
+        setLoading(false);
+        alert('Payment failed: ' + response.error.description);
+      });
+
+      console.log('🎯 Opening Razorpay modal...');
+      rzp.open();
+
     } catch (error) {
-      console.error('❌ Error:', error);
-      alert('Failed to open payment page. Please try again.');
+      console.error('❌ SUBSCRIPTION ERROR:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error message:', error.message);
+      console.error('Full error:', error);
+      
+      alert(error.response?.data?.message || error.message || 'Failed to create subscription. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -60,13 +150,13 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
           <button 
             onClick={onClose} 
             className="text-slate-400 hover:text-white transition-colors p-1 flex-shrink-0"
-            disabled={loading}
+            disabled={loading || paymentLoading}
           >
             <X size={18} />
           </button>
         </div>
         
-        {/* Plans */}
+        {/* Plans Comparison */}
         <div className="p-4 md:p-6">
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             {plans.map((plan) => (
@@ -77,7 +167,7 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
                     ? 'border-cyan-400/60 bg-cyan-500/5 shadow-lg shadow-cyan-500/10'
                     : 'border-slate-700 hover:border-slate-600 bg-slate-900/50'
                 }`}
-                onClick={() => !loading && setSelectedPlan(plan.type)}
+                onClick={() => !loading && !paymentLoading && setSelectedPlan(plan.type)}
               >
                 {plan.recommended && (
                   <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
@@ -125,20 +215,26 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
             ))}
           </div>
           
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-xs px-3 py-2 rounded-md mb-4">
+              {error}
+            </div>
+          )}
+          
           <div className="flex flex-col sm:flex-row justify-center gap-2">
             <button
               onClick={onClose}
               className="px-4 py-2 text-xs font-semibold text-slate-300 border border-slate-600 rounded-md hover:border-slate-500 hover:bg-slate-800/30 transition-all disabled:opacity-50"
-              disabled={loading}
+              disabled={loading || paymentLoading}
             >
               Maybe Later
             </button>
             <button
               onClick={handleSubscribe}
               className="px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-cyan-500 to-blue-500 rounded-md hover:from-cyan-400 hover:to-blue-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 disabled:opacity-50"
-              disabled={loading}
+              disabled={loading || paymentLoading}
             >
-              {loading ? (
+              {loading || paymentLoading ? (
                 <>
                   <div className="animate-spin">⚙️</div>
                   Processing...
@@ -146,15 +242,14 @@ const SubscriptionModal = ({ isOpen, onClose }) => {
               ) : (
                 <>
                   <Crown size={16} />
-                  Continue to Payment
-                  <ArrowRight size={14} />
+                  Subscribe to {selectedPlan === 'monthly' ? 'Monthly' : 'Yearly'}
                 </>
               )}
             </button>
           </div>
           
           <p className="text-center text-xs text-slate-500 mt-3">
-            Secure payment powered by Razorpay. Receipt sent automatically to your email.
+            By subscribing, you agree to automatic renewal. Cancel anytime from settings.
           </p>
         </div>
       </div>

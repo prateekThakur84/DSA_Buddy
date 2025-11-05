@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const User = require('../models/user.model');
 const Subscription = require('../models/subscription.model');
 
-// ============ GET PLANS ============
 const getPlans = async (req, res) => {
   try {
     res.status(200).json({
@@ -45,7 +44,7 @@ const getPlans = async (req, res) => {
       ]
     });
   } catch (error) {
-    console.error('❌ Get plans error:', error);
+    console.error('Get plans error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch plans'
@@ -53,7 +52,6 @@ const getPlans = async (req, res) => {
   }
 };
 
-// ============ CREATE SUBSCRIPTION ============
 const createSubscription = async (req, res) => {
   try {
     console.log('🔴 ===== CREATE SUBSCRIPTION CALLED =====');
@@ -64,7 +62,6 @@ const createSubscription = async (req, res) => {
     const { planType } = req.body;
     const userId = req.user._id;
 
-    // Validate planType
     if (!planType || !['monthly', 'yearly'].includes(planType)) {
       console.log('❌ Invalid plan type:', planType);
       return res.status(400).json({
@@ -75,7 +72,6 @@ const createSubscription = async (req, res) => {
 
     console.log('📋 Plan type validated:', planType);
 
-    // Get user from database
     const user = await User.findById(userId);
     
     if (!user) {
@@ -88,7 +84,6 @@ const createSubscription = async (req, res) => {
 
     console.log('✅ User found:', user.emailId);
 
-    // Check if user already has active subscription
     if (user.isPremiumActive()) {
       console.log('⚠️ User already has active subscription');
       return res.status(400).json({
@@ -101,7 +96,6 @@ const createSubscription = async (req, res) => {
       });
     }
 
-    // Get plan from config
     const plan = SUBSCRIPTION_PLANS[planType];
     
     if (!plan) {
@@ -114,7 +108,7 @@ const createSubscription = async (req, res) => {
 
     console.log('✅ Plan found:', { planType, planId: plan.planId, amount: plan.amount });
 
-    // ✅ GET OR CREATE RAZORPAY CUSTOMER
+    // Get or create Razorpay customer
     let customerId = user.razorpayCustomerId;
 
     if (!customerId) {
@@ -143,7 +137,7 @@ const createSubscription = async (req, res) => {
             });
             
             if (customersResponse.items && customersResponse.items.length > 0) {
-              customerId = customersResponse.items.id;
+              customerId = customersResponse.items[0].id;
               console.log('✅ Existing Razorpay customer found and reused:', customerId);
             } else {
               throw new Error('Could not find existing customer by email');
@@ -171,7 +165,7 @@ const createSubscription = async (req, res) => {
       console.log('✅ Using existing customer from user profile:', customerId);
     }
 
-    // ✅ CREATE SUBSCRIPTION IN RAZORPAY
+    // Create subscription
     const subscriptionData = {
       plan_id: plan.planId,
       customer_id: customerId,
@@ -201,7 +195,7 @@ const createSubscription = async (req, res) => {
       });
     }
 
-    // ✅ SAVE SUBSCRIPTION TO DATABASE
+    // Save to database
     try {
       console.log('📝 Saving subscription to database...');
       const newSubscription = await Subscription.create({
@@ -250,7 +244,6 @@ const createSubscription = async (req, res) => {
   }
 };
 
-// ============ VERIFY PAYMENT ============
 const verifyPayment = async (req, res) => {
   try {
     console.log('🔵 ===== VERIFY PAYMENT CALLED =====');
@@ -300,8 +293,11 @@ const verifyPayment = async (req, res) => {
 
     console.log('✅ Subscription found in DB:', subscription._id);
 
+    // Fetch from Razorpay
+    console.log('📝 Fetching subscription details from Razorpay...');
     const rzpSubscription = await razorpayInstance.subscriptions.fetch(razorpay_subscription_id);
 
+    // Update subscription
     subscription.status = rzpSubscription.status;
     subscription.startDate = new Date(rzpSubscription.start_at * 1000);
     subscription.endDate = new Date(rzpSubscription.end_at * 1000);
@@ -314,7 +310,9 @@ const verifyPayment = async (req, res) => {
     subscription.totalCount = rzpSubscription.total_count;
     
     await subscription.save();
+    console.log('✅ Subscription updated in DB');
 
+    // Update user to premium
     const user = await User.findById(subscription.userId);
     
     if (!user) {
@@ -367,7 +365,6 @@ const verifyPayment = async (req, res) => {
   }
 };
 
-// ============ GET SUBSCRIPTION STATUS ============
 const getSubscriptionStatus = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -434,7 +431,7 @@ const getSubscriptionStatus = async (req, res) => {
       paymentHistory: user.paymentHistory.slice(-5).reverse()
     });
   } catch (error) {
-    console.error('❌ Get subscription status error:', error);
+    console.error('Get subscription status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch subscription status'
@@ -442,7 +439,6 @@ const getSubscriptionStatus = async (req, res) => {
   }
 };
 
-// ============ CANCEL SUBSCRIPTION ============
 const cancelSubscription = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -480,7 +476,7 @@ const cancelSubscription = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Cancel subscription error:', error);
+    console.error('Cancel subscription error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel subscription',
