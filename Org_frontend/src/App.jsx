@@ -19,6 +19,7 @@ import ForgotPassword from "./pages/Auth/ForgotPassword";
 import ResetPassword from "./pages/Auth/ResetPassword";
 import EmailVerification from "./components/Auth/EmailVerification";
 import GoogleCallback from "./pages/Auth/GoogleCallback"; // ✅ ADDED
+import SuccessPage from "./pages/Pricing/SuccessPage";
 
 // Public Pages
 import LandingPage from "./pages/Public/LandingPage";
@@ -65,6 +66,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<About />} />
         <Route path="/price" element={<PricingPage />} />
+        <Route path="/success" element={<SuccessPage />} />
         
         <Route
           path="/dashboard"

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const User = require('../models/user.model');
 const Subscription = require('../models/subscription.model');
 
+// ============ GET PLANS ============
 const getPlans = async (req, res) => {
   try {
     res.status(200).json({
@@ -44,7 +45,7 @@ const getPlans = async (req, res) => {
       ]
     });
   } catch (error) {
-    console.error('Get plans error:', error);
+    console.error('❌ Get plans error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch plans'
@@ -52,6 +53,7 @@ const getPlans = async (req, res) => {
   }
 };
 
+// ============ CREATE SUBSCRIPTION ============
 const createSubscription = async (req, res) => {
   try {
     console.log('🔴 ===== CREATE SUBSCRIPTION CALLED =====');
@@ -62,7 +64,8 @@ const createSubscription = async (req, res) => {
     const { planType } = req.body;
     const userId = req.user._id;
 
-    if (!['monthly', 'yearly'].includes(planType)) {
+    // Validate planType
+    if (!planType || !['monthly', 'yearly'].includes(planType)) {
       console.log('❌ Invalid plan type:', planType);
       return res.status(400).json({
         success: false,
@@ -70,6 +73,9 @@ const createSubscription = async (req, res) => {
       });
     }
 
+    console.log('📋 Plan type validated:', planType);
+
+    // Get user from database
     const user = await User.findById(userId);
     
     if (!user) {
@@ -82,6 +88,7 @@ const createSubscription = async (req, res) => {
 
     console.log('✅ User found:', user.emailId);
 
+    // Check if user already has active subscription
     if (user.isPremiumActive()) {
       console.log('⚠️ User already has active subscription');
       return res.status(400).json({
@@ -94,10 +101,20 @@ const createSubscription = async (req, res) => {
       });
     }
 
+    // Get plan from config
     const plan = SUBSCRIPTION_PLANS[planType];
-    console.log('📋 Using plan:', { planType, planId: plan.planId, amount: plan.amount });
+    
+    if (!plan) {
+      console.error('❌ Plan not found in config:', planType);
+      return res.status(400).json({
+        success: false,
+        message: 'Plan not found'
+      });
+    }
 
-    // ✅ IMPROVED: Get or create Razorpay customer with proper error handling
+    console.log('✅ Plan found:', { planType, planId: plan.planId, amount: plan.amount });
+
+    // ✅ GET OR CREATE RAZORPAY CUSTOMER
     let customerId = user.razorpayCustomerId;
 
     if (!customerId) {
@@ -105,7 +122,7 @@ const createSubscription = async (req, res) => {
         console.log('📝 Creating/Fetching Razorpay customer...');
         
         try {
-          // Try to create customer
+          console.log('📤 Attempting to create new customer in Razorpay...');
           const customer = await razorpayInstance.customers.create({
             name: `${user.firstName} ${user.lastName || ''}`.trim(),
             email: user.emailId,
@@ -118,47 +135,43 @@ const createSubscription = async (req, res) => {
           customerId = customer.id;
           console.log('✅ New Razorpay customer created:', customerId);
         } catch (createError) {
-          // If customer already exists, fetch it by email
           if (createError.statusCode === 400 && createError.error?.description?.includes('already exists')) {
             console.log('📝 Customer exists in Razorpay, fetching by email...');
             
-            // Search for existing customer by email
-            const customers = await razorpayInstance.customers.all({
+            const customersResponse = await razorpayInstance.customers.all({
               email: user.emailId
             });
             
-            if (customers.items && customers.items.length > 0) {
-              customerId = customers.items[0].id;
-              console.log('✅ Existing Razorpay customer found:', customerId);
+            if (customersResponse.items && customersResponse.items.length > 0) {
+              customerId = customersResponse.items.id;
+              console.log('✅ Existing Razorpay customer found and reused:', customerId);
             } else {
-              throw new Error('Could not find or create customer');
+              throw new Error('Could not find existing customer by email');
             }
           } else {
             throw createError;
           }
         }
         
-        // Save customer ID to user profile
         if (customerId) {
           user.razorpayCustomerId = customerId;
           await user.save();
-          console.log('✅ Customer ID saved to user profile:', customerId);
+          console.log('✅ Customer ID saved to user:', customerId);
         }
         
       } catch (customerError) {
         console.error('❌ Failed to get Razorpay customer:', customerError.message);
-        console.error('Full error:', customerError);
         return res.status(500).json({
           success: false,
-          message: 'Failed to create customer profile',
+          message: 'Failed to setup customer profile',
           error: customerError.message
         });
       }
     } else {
-      console.log('✅ Using existing Razorpay customer:', customerId);
+      console.log('✅ Using existing customer from user profile:', customerId);
     }
 
-    // Create subscription on Razorpay
+    // ✅ CREATE SUBSCRIPTION IN RAZORPAY
     const subscriptionData = {
       plan_id: plan.planId,
       customer_id: customerId,
@@ -178,17 +191,17 @@ const createSubscription = async (req, res) => {
     let subscription;
     try {
       subscription = await razorpayInstance.subscriptions.create(subscriptionData);
-      console.log('✅ Razorpay subscription created:', subscription.id);
+      console.log('✅ Razorpay subscription created successfully:', subscription.id);
     } catch (razorpayError) {
       console.error('❌ Failed to create Razorpay subscription:', razorpayError.message);
       return res.status(500).json({
         success: false,
-        message: 'Failed to create subscription',
+        message: 'Failed to create subscription on payment gateway',
         error: razorpayError.message
       });
     }
 
-    // Save subscription to database
+    // ✅ SAVE SUBSCRIPTION TO DATABASE
     try {
       console.log('📝 Saving subscription to database...');
       const newSubscription = await Subscription.create({
@@ -222,7 +235,7 @@ const createSubscription = async (req, res) => {
       console.error('❌ Failed to save subscription to DB:', dbError.message);
       return res.status(500).json({
         success: false,
-        message: 'Failed to save subscription',
+        message: 'Failed to save subscription to database',
         error: dbError.message
       });
     }
@@ -237,7 +250,7 @@ const createSubscription = async (req, res) => {
   }
 };
 
-
+// ============ VERIFY PAYMENT ============
 const verifyPayment = async (req, res) => {
   try {
     console.log('🔵 ===== VERIFY PAYMENT CALLED =====');
@@ -249,6 +262,7 @@ const verifyPayment = async (req, res) => {
     } = req.body;
 
     if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
+      console.error('❌ Missing payment details');
       return res.status(400).json({
         success: false,
         message: 'Missing payment details'
@@ -256,6 +270,7 @@ const verifyPayment = async (req, res) => {
     }
 
     console.log('🔐 Verifying payment signature...');
+
     const generatedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_SECRET)
       .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
@@ -276,17 +291,16 @@ const verifyPayment = async (req, res) => {
     });
 
     if (!subscription) {
-      console.error('❌ Subscription not found:', razorpay_subscription_id);
+      console.error('❌ Subscription not found in DB:', razorpay_subscription_id);
       return res.status(404).json({
         success: false,
         message: 'Subscription not found'
       });
     }
 
-    console.log('📝 Fetching Razorpay subscription details...');
-    const rzpSubscription = await razorpayInstance.subscriptions.fetch(razorpay_subscription_id);
+    console.log('✅ Subscription found in DB:', subscription._id);
 
-    console.log('✅ Razorpay subscription status:', rzpSubscription.status);
+    const rzpSubscription = await razorpayInstance.subscriptions.fetch(razorpay_subscription_id);
 
     subscription.status = rzpSubscription.status;
     subscription.startDate = new Date(rzpSubscription.start_at * 1000);
@@ -299,10 +313,8 @@ const verifyPayment = async (req, res) => {
     subscription.remainingCount = rzpSubscription.remaining_count;
     subscription.totalCount = rzpSubscription.total_count;
     
-    console.log('📝 Saving subscription updates to DB...');
     await subscription.save();
 
-    console.log('👤 Updating user to premium...');
     const user = await User.findById(subscription.userId);
     
     if (!user) {
@@ -331,6 +343,7 @@ const verifyPayment = async (req, res) => {
     await user.save();
 
     console.log(`✅ User ${user._id} upgraded to premium until ${subscription.endDate}`);
+    console.log('✅ Razorpay automatically sends receipt to:', user.emailId);
 
     res.status(200).json({
       success: true,
@@ -345,8 +358,7 @@ const verifyPayment = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Verify payment error:', error);
-    console.error('Error message:', error.message);
+    console.error('❌ Error in verify payment:', error.message);
     res.status(500).json({
       success: false,
       message: 'Payment verification failed',
@@ -355,6 +367,7 @@ const verifyPayment = async (req, res) => {
   }
 };
 
+// ============ GET SUBSCRIPTION STATUS ============
 const getSubscriptionStatus = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -421,7 +434,7 @@ const getSubscriptionStatus = async (req, res) => {
       paymentHistory: user.paymentHistory.slice(-5).reverse()
     });
   } catch (error) {
-    console.error('Get subscription status error:', error);
+    console.error('❌ Get subscription status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch subscription status'
@@ -429,6 +442,7 @@ const getSubscriptionStatus = async (req, res) => {
   }
 };
 
+// ============ CANCEL SUBSCRIPTION ============
 const cancelSubscription = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -454,7 +468,7 @@ const cancelSubscription = async (req, res) => {
       }
     );
 
-    console.log(`Subscription ${user.razorpaySubscriptionId} cancelled for user ${userId}`);
+    console.log(`✅ Subscription ${user.razorpaySubscriptionId} cancelled for user ${userId}`);
 
     res.status(200).json({
       success: true,
@@ -466,7 +480,7 @@ const cancelSubscription = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Cancel subscription error:', error);
+    console.error('❌ Cancel subscription error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel subscription',
