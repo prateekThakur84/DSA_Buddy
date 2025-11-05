@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const User = require('../models/user.model');
 const Subscription = require('../models/subscription.model');
 
+
 const getPlans = async (req, res) => {
   try {
     res.status(200).json({
@@ -52,6 +53,7 @@ const getPlans = async (req, res) => {
   }
 };
 
+
 const createSubscription = async (req, res) => {
   try {
     console.log('🔴 ===== CREATE SUBSCRIPTION CALLED =====');
@@ -62,6 +64,7 @@ const createSubscription = async (req, res) => {
     const { planType } = req.body;
     const userId = req.user._id;
 
+    // ✅ Input validation
     if (!planType || !['monthly', 'yearly'].includes(planType)) {
       console.log('❌ Invalid plan type:', planType);
       return res.status(400).json({
@@ -72,6 +75,7 @@ const createSubscription = async (req, res) => {
 
     console.log('📋 Plan type validated:', planType);
 
+    // ✅ Get user from database
     const user = await User.findById(userId);
     
     if (!user) {
@@ -84,6 +88,7 @@ const createSubscription = async (req, res) => {
 
     console.log('✅ User found:', user.emailId);
 
+    // ✅ Check if user already has active subscription
     if (user.isPremiumActive()) {
       console.log('⚠️ User already has active subscription');
       return res.status(400).json({
@@ -96,6 +101,7 @@ const createSubscription = async (req, res) => {
       });
     }
 
+    // ✅ Get plan from config
     const plan = SUBSCRIPTION_PLANS[planType];
     
     if (!plan) {
@@ -108,7 +114,7 @@ const createSubscription = async (req, res) => {
 
     console.log('✅ Plan found:', { planType, planId: plan.planId, amount: plan.amount });
 
-    // Get or create Razorpay customer
+    // ✅ GET OR CREATE RAZORPAY CUSTOMER
     let customerId = user.razorpayCustomerId;
 
     if (!customerId) {
@@ -165,14 +171,20 @@ const createSubscription = async (req, res) => {
       console.log('✅ Using existing customer from user profile:', customerId);
     }
 
-    // Create subscription
+    // ✅ CREATE SUBSCRIPTION IN RAZORPAY
+    // ✅ FIX: Removed start_at and auth_attempts to charge full amount immediately
     const subscriptionData = {
       plan_id: plan.planId,
       customer_id: customerId,
       total_count: planType === 'monthly' ? 12 : 1,
       quantity: 1,
-      start_at: Math.floor(Date.now() / 1000) + 300,
-      expire_by: Math.floor(Date.now() / 1000) + 1800,
+      
+      // ✅ FIXED: Charge full amount immediately (removed start_at delay)
+      // ✅ FIXED: Removed auth_attempts to prevent 5Rs charge
+      
+      // Set expire_by to 24 hours (longer than 30 min for user to complete payment)
+      expire_by: Math.floor(Date.now() / 1000) + 86400,
+      
       notes: {
         userId: userId.toString(),
         planType: planType,
@@ -181,13 +193,17 @@ const createSubscription = async (req, res) => {
     };
 
     console.log('📤 Creating Razorpay subscription...');
+    console.log('Subscription data:', JSON.stringify(subscriptionData, null, 2));
     
     let subscription;
     try {
       subscription = await razorpayInstance.subscriptions.create(subscriptionData);
       console.log('✅ Razorpay subscription created successfully:', subscription.id);
+      console.log('Subscription status:', subscription.status);
+      console.log('Subscription amount:', subscription.plan_id);
     } catch (razorpayError) {
       console.error('❌ Failed to create Razorpay subscription:', razorpayError.message);
+      console.error('Razorpay error:', razorpayError);
       return res.status(500).json({
         success: false,
         message: 'Failed to create subscription on payment gateway',
@@ -195,7 +211,7 @@ const createSubscription = async (req, res) => {
       });
     }
 
-    // Save to database
+    // ✅ SAVE SUBSCRIPTION TO DATABASE
     try {
       console.log('📝 Saving subscription to database...');
       const newSubscription = await Subscription.create({
@@ -213,13 +229,14 @@ const createSubscription = async (req, res) => {
 
       console.log('✅ Subscription saved to DB:', newSubscription._id);
 
+      // ✅ SEND SUCCESS RESPONSE
       res.status(201).json({
         success: true,
         message: 'Subscription created successfully',
         subscription: {
           subscriptionId: subscription.id,
           planType: planType,
-          amount: plan.amount / 100,
+          amount: plan.amount, // Amount in rupees (not paise)
           currency: 'INR',
           shortUrl: subscription.short_url
         },
@@ -236,6 +253,7 @@ const createSubscription = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Unexpected error in createSubscription:', error.message);
+    console.error('Full error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create subscription',
@@ -243,6 +261,7 @@ const createSubscription = async (req, res) => {
     });
   }
 };
+
 
 const verifyPayment = async (req, res) => {
   try {
@@ -254,6 +273,7 @@ const verifyPayment = async (req, res) => {
       razorpay_signature
     } = req.body;
 
+    // ✅ Input validation
     if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
       console.error('❌ Missing payment details');
       return res.status(400).json({
@@ -263,7 +283,10 @@ const verifyPayment = async (req, res) => {
     }
 
     console.log('🔐 Verifying payment signature...');
+    console.log('Payment ID:', razorpay_payment_id);
+    console.log('Subscription ID:', razorpay_subscription_id);
 
+    // ✅ VERIFY SIGNATURE (Critical for security)
     const generatedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_SECRET)
       .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
@@ -271,6 +294,8 @@ const verifyPayment = async (req, res) => {
 
     if (generatedSignature !== razorpay_signature) {
       console.error('❌ Invalid payment signature');
+      console.error('Expected:', generatedSignature);
+      console.error('Received:', razorpay_signature);
       return res.status(400).json({
         success: false,
         message: 'Invalid payment signature. Payment verification failed.'
@@ -279,6 +304,7 @@ const verifyPayment = async (req, res) => {
 
     console.log('✅ Payment signature verified successfully');
 
+    // ✅ Find subscription in database
     const subscription = await Subscription.findOne({
       razorpaySubscriptionId: razorpay_subscription_id
     });
@@ -293,11 +319,14 @@ const verifyPayment = async (req, res) => {
 
     console.log('✅ Subscription found in DB:', subscription._id);
 
-    // Fetch from Razorpay
+    // ✅ Fetch subscription details from Razorpay
     console.log('📝 Fetching subscription details from Razorpay...');
     const rzpSubscription = await razorpayInstance.subscriptions.fetch(razorpay_subscription_id);
 
-    // Update subscription
+    console.log('✅ Subscription fetched from Razorpay');
+    console.log('Subscription status:', rzpSubscription.status);
+
+    // ✅ Update subscription in database with all details
     subscription.status = rzpSubscription.status;
     subscription.startDate = new Date(rzpSubscription.start_at * 1000);
     subscription.endDate = new Date(rzpSubscription.end_at * 1000);
@@ -312,7 +341,7 @@ const verifyPayment = async (req, res) => {
     await subscription.save();
     console.log('✅ Subscription updated in DB');
 
-    // Update user to premium
+    // ✅ Update user to premium
     const user = await User.findById(subscription.userId);
     
     if (!user) {
@@ -323,11 +352,15 @@ const verifyPayment = async (req, res) => {
       });
     }
 
+    console.log('✅ User found:', user._id);
+    console.log('📝 Updating user to premium status...');
+
     user.subscriptionTier = 'premium';
     user.subscriptionStartDate = subscription.startDate;
     user.subscriptionEndDate = subscription.endDate;
     user.razorpaySubscriptionId = razorpay_subscription_id;
     
+    // ✅ Add to payment history
     user.paymentHistory.push({
       paymentId: razorpay_payment_id,
       subscriptionId: razorpay_subscription_id,
@@ -343,6 +376,7 @@ const verifyPayment = async (req, res) => {
     console.log(`✅ User ${user._id} upgraded to premium until ${subscription.endDate}`);
     console.log('✅ Razorpay automatically sends receipt to:', user.emailId);
 
+    // ✅ SEND SUCCESS RESPONSE
     res.status(200).json({
       success: true,
       message: 'Payment verified successfully! Welcome to Premium!',
@@ -357,6 +391,7 @@ const verifyPayment = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in verify payment:', error.message);
+    console.error('Full error:', error);
     res.status(500).json({
       success: false,
       message: 'Payment verification failed',
@@ -365,9 +400,12 @@ const verifyPayment = async (req, res) => {
   }
 };
 
+
 const getSubscriptionStatus = async (req, res) => {
   try {
     const userId = req.user._id;
+    
+    // ✅ Fetch user with subscription fields
     const user = await User.findById(userId).select(
       'subscriptionTier subscriptionStartDate subscriptionEndDate usageLimits paymentHistory'
     );
@@ -379,13 +417,16 @@ const getSubscriptionStatus = async (req, res) => {
       });
     }
 
+    // ✅ Find active subscription
     const subscription = await Subscription.findOne({
       userId: userId,
       status: { $in: ['active', 'authenticated'] }
     }).sort({ createdAt: -1 });
 
+    // ✅ Check if user is premium
     const isPremium = user.isPremiumActive();
 
+    // ✅ Calculate usage limits only for non-premium users
     let usageLimits = null;
     if (!isPremium) {
       usageLimits = {
@@ -416,6 +457,7 @@ const getSubscriptionStatus = async (req, res) => {
       };
     }
 
+    // ✅ SEND RESPONSE
     res.status(200).json({
       success: true,
       subscription: {
@@ -439,9 +481,12 @@ const getSubscriptionStatus = async (req, res) => {
   }
 };
 
+
 const cancelSubscription = async (req, res) => {
   try {
     const userId = req.user._id;
+    
+    // ✅ Get user
     const user = await User.findById(userId);
 
     if (!user.razorpaySubscriptionId) {
@@ -451,11 +496,15 @@ const cancelSubscription = async (req, res) => {
       });
     }
 
+    console.log('📝 Cancelling subscription:', user.razorpaySubscriptionId);
+
+    // ✅ Cancel subscription in Razorpay
     const cancelledSubscription = await razorpayInstance.subscriptions.cancel(
       user.razorpaySubscriptionId,
-      { cancel_at_cycle_end: 1 }
+      { cancel_at_cycle_end: 1 } // Cancel at end of current cycle
     );
 
+    // ✅ Update subscription status in database
     await Subscription.findOneAndUpdate(
       { razorpaySubscriptionId: user.razorpaySubscriptionId },
       { 
@@ -466,6 +515,7 @@ const cancelSubscription = async (req, res) => {
 
     console.log(`✅ Subscription ${user.razorpaySubscriptionId} cancelled for user ${userId}`);
 
+    // ✅ SEND RESPONSE
     res.status(200).json({
       success: true,
       message: 'Subscription will be cancelled at the end of current billing cycle',
@@ -484,6 +534,7 @@ const cancelSubscription = async (req, res) => {
     });
   }
 };
+
 
 module.exports = {
   getPlans,

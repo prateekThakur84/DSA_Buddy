@@ -38,71 +38,104 @@ const handleSubscriptionWebhook = async (req, res) => {
     });
     
     if (!signature) {
-      console.error('No signature in webhook request');
+      console.error('❌ No signature in webhook request');
       return res.status(400).json({ success: false, message: 'Missing signature' });
     }
 
-    // ✅ FIXED: Convert buffer to string if needed
     let bodyToVerify = req.body;
     if (Buffer.isBuffer(req.body)) {
       bodyToVerify = req.body.toString('utf8');
     }
 
     if (!verifyWebhookSignature(bodyToVerify, signature)) {
-      console.error('Invalid webhook signature');
+      console.error('❌ Invalid webhook signature');
       return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
-    // ✅ FIXED: Parse body if it's a string
     let body = req.body;
     if (typeof body === 'string') {
       body = JSON.parse(body);
     }
 
-    const { event, payload } = body;
-    const subscriptionData = payload.subscription?.entity;
-    const paymentData = payload.payment?.entity;
+    console.log('✅ Webhook verified');
+    console.log('Event type:', body.event);
+    
+    // ✅ FIX: Access payload correctly - it comes from Razorpay
+    const { event } = body;
+    let subscriptionData = null;
+    let paymentData = null;
 
-    console.log(`✓ Webhook verified and processed: ${event} for subscription: ${subscriptionData?.id}`);
+    // ✅ IMPORTANT: Check different payload structures
+    if (body.payload?.subscription?.entity) {
+      subscriptionData = body.payload.subscription.entity;
+    } else if (body.payload?.entity) {
+      subscriptionData = body.payload.entity;
+    }
 
+    if (body.payload?.payment?.entity) {
+      paymentData = body.payload.payment.entity;
+    }
+
+    console.log(`✓ Processing event: ${event}`);
+    console.log('Subscription ID:', subscriptionData?.id);
+
+    // ✅ Handle based on event type
     switch (event) {
       case 'subscription.activated':
-        await handleSubscriptionActivated(subscriptionData);
+        if (subscriptionData) {
+          await handleSubscriptionActivated(subscriptionData);
+        }
         break;
       case 'subscription.charged':
-        await handleSubscriptionCharged(subscriptionData, paymentData);
+        if (subscriptionData) {
+          await handleSubscriptionCharged(subscriptionData, paymentData);
+        }
         break;
       case 'subscription.cancelled':
-        await handleSubscriptionCancelled(subscriptionData);
+        if (subscriptionData) {
+          await handleSubscriptionCancelled(subscriptionData);
+        }
         break;
       case 'subscription.paused':
-        await handleSubscriptionPaused(subscriptionData);
+        if (subscriptionData) {
+          await handleSubscriptionPaused(subscriptionData);
+        }
         break;
       case 'subscription.resumed':
-        await handleSubscriptionResumed(subscriptionData);
+        if (subscriptionData) {
+          await handleSubscriptionResumed(subscriptionData);
+        }
         break;
       case 'subscription.pending':
-        await handleSubscriptionPending(subscriptionData);
+        if (subscriptionData) {
+          await handleSubscriptionPending(subscriptionData);
+        }
         break;
       case 'subscription.halted':
-        await handleSubscriptionHalted(subscriptionData);
+        if (subscriptionData) {
+          await handleSubscriptionHalted(subscriptionData);
+        }
         break;
       case 'subscription.completed':
-        await handleSubscriptionCompleted(subscriptionData);
+        if (subscriptionData) {
+          await handleSubscriptionCompleted(subscriptionData);
+        }
         break;
       case 'payment.failed':
-        console.log(`Payment failed for subscription: ${paymentData?.subscription_id}`);
+        console.log(`⚠️ Payment failed for subscription:`, subscriptionData?.id);
         break;
       default:
-        console.log(`Unhandled webhook event: ${event}`);
+        console.log(`⚠️ Unhandled webhook event: ${event}`);
     }
 
     res.status(200).json({ success: true, message: 'Webhook processed successfully' });
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    console.error('❌ Webhook processing error:', error);
+    // ✅ IMPORTANT: Always return 200 to acknowledge receipt
     res.status(200).json({ success: false, message: 'Webhook processing failed but acknowledged' });
   }
 };
+
 
 const handleSubscriptionActivated = async (data) => {
   try {
