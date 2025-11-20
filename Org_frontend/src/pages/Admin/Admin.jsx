@@ -64,7 +64,7 @@ const Admin = () => {
       title: 'Video Solutions',
       description: 'Upload and manage video solutions',
       icon: Video,
-      path: '/admin/video',
+      path: '/admin/videos',
       color: 'from-purple-400 to-purple-600',
       bgColor: 'bg-purple-400/10 border-purple-400/20'
     },
