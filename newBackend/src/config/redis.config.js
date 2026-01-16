@@ -7,8 +7,8 @@ const redisClient = createClient({
   username: 'default',
   password: process.env.REDIS_PASS,
   socket: {
-    host: 'redis-15313.crce179.ap-south-1-1.ec2.redns.redis-cloud.com',
-    port: 15313,
+    host: 'redis-19389.crce263.ap-south-1-1.ec2.cloud.redislabs.com',
+    port: 19389,
     reconnectStrategy: (retries) => {
       if (retries > 10) {
         console.error('❌ Redis: Too many reconnection attempts');
