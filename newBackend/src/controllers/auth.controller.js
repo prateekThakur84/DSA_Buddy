@@ -1,4 +1,4 @@
-// const redisClient = require("../config/redis.config");
+const redisClient = require("../config/redis.config");
 const User = require("../models/user.model");
 const validate = require('../utils/validation.util');
 const bcrypt = require("bcrypt");
@@ -425,13 +425,13 @@ const checkAuth = async (req, res) => {
     
     const payload = jwt.verify(token, process.env.JWT_KEY);
     
-    // const isBlacklisted = await redisClient.exists(`token:${token}`);
-    // if (isBlacklisted) {
-    //   return res.status(401).json({
-    //     success: false,
-    //     message: "Token is invalid"
-    //   });
-    // }
+    const isBlacklisted = await redisClient.exists(`token:${token}`);
+    if (isBlacklisted) {
+      return res.status(401).json({
+        success: false,
+        message: "Token is invalid"
+      });
+    }
     
     const user = await User.findById(payload._id).select('-password');
     if (!user) {
@@ -486,13 +486,13 @@ const logout = async (req, res) => {
       token = req.cookies.token;
     }
     
-    // if (token) {
-    //   const payload = jwt.decode(token);
-    //   if (payload && payload.exp) {
-    //     await redisClient.set(`token:${token}`, 'blacklisted');
-    //     await redisClient.expireAt(`token:${token}`, payload.exp);
-    //   }
-    // }
+    if (token) {
+      const payload = jwt.decode(token);
+      if (payload && payload.exp) {
+        await redisClient.set(`token:${token}`, 'blacklisted');
+        await redisClient.expireAt(`token:${token}`, payload.exp);
+      }
+    }
     
     // Clear cookie if exists
     res.cookie("token", null, { expires: new Date(Date.now()) });
