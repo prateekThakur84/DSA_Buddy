@@ -21,6 +21,8 @@ const usageRouter = require("./src/routes/usage.routes");
 
 const app = express();
 
+app.enable('trust proxy');
+
 // ========================================
 // MIDDLEWARE CONFIGURATION
 // ========================================
