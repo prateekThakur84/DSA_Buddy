@@ -29,11 +29,16 @@ const config = {
 
 // Create Reusable Transporter Object using Gmail SMTP
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: "smtp.gmail.com", // Explicit host
+  port: 587,              // Explicit port (Standard for modern SMTP)
+  secure: false,          // false for port 587 (uses STARTTLS)
   auth: {
-    user: process.env.EMAIL_USER, // Your Gmail address
-    pass: process.env.EMAIL_PASS, // Your Gmail App Password
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS, // Use Environment Variable!
   },
+  tls: {
+    rejectUnauthorized: false // Helps avoid some certificate issues on cloud servers
+  }
 });
 
 
