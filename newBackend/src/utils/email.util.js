@@ -3,7 +3,7 @@
  * EMAIL UTILITY - NODEMAILER (SMTP)
  * =============================================================================
  * Free email sending using Gmail SMTP via Nodemailer
- * Best for personal projects/startups to avoid API limits
+ * UPDATED: Fixed for Render timeouts using Port 465 + IPv4
  * =============================================================================
  */
 
@@ -27,18 +27,28 @@ const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 };
 
-// Create Reusable Transporter Object using Gmail SMTP
+/** * 🚀 CRITICAL FIX: SECURE TRANSPORTER FOR RENDER
+ * This replaces the simple 'service: gmail' config to prevent timeouts
+ */
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com', // Explicit host
+  port: 465,              // Explicit SSL port (more reliable on cloud)
+  secure: true,           // secure:true for port 465
   auth: {
-    user: process.env.EMAIL_USER, // Your Gmail address
-    pass: process.env.EMAIL_PASS, // Your Gmail App Password
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
+  // Fix for "ETIMEDOUT" on Docker/Render
+  tls: {
+    rejectUnauthorized: false, // Helps avoid handshake failures
+  },
+  // Force IPv4 if IPv6 is failing (common cause of timeouts)
+  family: 4, 
 });
 
 /**
  * =============================================================================
- * EMAIL TEMPLATES (Unchanged from your original code)
+ * EMAIL TEMPLATES (Unchanged)
  * =============================================================================
  */
 
@@ -139,7 +149,7 @@ const getPasswordResetEmailTemplate = (firstName, resetUrl) => {
 
 /**
  * =============================================================================
- * EMAIL SENDING FUNCTIONS (Updated for Nodemailer)
+ * EMAIL SENDING FUNCTIONS
  * =============================================================================
  */
 
