@@ -13,9 +13,9 @@ const LandingPage = () => {
       
       <main className="relative">
         <HeroSection />
-        <FeaturesSection />
-        <StatsSection />
-        <CTASection />
+        {/* <FeaturesSection /> */}
+        {/* <StatsSection /> */}
+        {/* <CTASection /> */}
       </main>
 
       {/* background effect      */}

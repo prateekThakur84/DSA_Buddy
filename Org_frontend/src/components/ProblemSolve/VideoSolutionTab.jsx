@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import Plyr from "plyr-react";
 import "plyr-react/plyr.css";
-import { Crown, Lock, Play, Zap } from "lucide-react";
+import { Crown, Lock, Play, Zap, AlertCircle } from "lucide-react"; // Added AlertCircle
 import { useSubscription } from "../../hooks/useSubscription";
 import PaywallModal from "../common/PayWallModal";
 import axiosInstance from "../../utils/axiosClient";
@@ -26,9 +26,16 @@ const VideoSolutionTab = ({ problem }) => {
     );
   }
 
+  // Check if limit is reached
   const videoLimitReached = !isPremium && hasLimitReached("videoSolutionViews");
 
   const handleUnlockVideo = async () => {
+    // Double check limit before calling API
+    if (videoLimitReached) {
+        setShowPaywall(true);
+        return;
+    }
+
     try {
       setUnlocking(true);
       const response = await axiosInstance.post(
@@ -75,22 +82,10 @@ const VideoSolutionTab = ({ problem }) => {
     },
   };
 
-  if (videoLimitReached) {
-    return (
-      <>
-        {/* existing paywall code */}
-        <PaywallModal
-          isOpen={showPaywall}
-          onClose={() => setShowPaywall(false)}
-          feature="Video Solutions"
-          usage={usageLimits?.videoSolutionViews}
-        />
-      </>
-    );
-  }
+  // --- ❌ DELETED THE EARLY RETURN BLOCK THAT CAUSED THE ISSUE ---
 
   return (
-    <div className="relative space-y-3"> {/* ✅ make entire component relative */}
+    <div className="relative space-y-3">
       {/* Premium Badge */}
       {isPremium ? (
         <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 flex items-center justify-between">
@@ -107,7 +102,7 @@ const VideoSolutionTab = ({ problem }) => {
             <div className="flex-1">
               <span className="text-xs font-medium text-white">
                 Credits Remaining:{" "}
-                <span className="text-cyan-400 font-bold">
+                <span className={`${videoLimitReached ? "text-red-400" : "text-cyan-400"} font-bold`}>
                   {usageLimits.videoSolutionViews.remaining}
                 </span>{" "}
                 / {usageLimits.videoSolutionViews.limit}
@@ -152,65 +147,88 @@ const VideoSolutionTab = ({ problem }) => {
         </p>
       </div>
 
-      {/* ✅ FULL COMPONENT LOCK OVERLAY */}
+      {/* ✅ UPDATED LOCK OVERLAY TO HANDLE LIMIT REACHED */}
       {!videoUnlocked && !isPremium && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 rounded-lg p-6">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-40 rounded-lg p-6">
           <div className="text-center max-w-xs px-4">
+            
+            {/* Header Icon */}
             <div className="bg-cyan-500/20 p-4 rounded-full border border-cyan-500/40 w-fit mx-auto mb-4">
-              <Lock className="text-cyan-400" size={40} />
+              {videoLimitReached ? (
+                <AlertCircle className="text-red-400" size={40} />
+              ) : (
+                <Lock className="text-cyan-400" size={40} />
+              )}
             </div>
+
+            {/* Title */}
             <h3 className="text-xl font-bold text-white mb-2">
-              Video Solution Locked
+              {videoLimitReached ? "Daily Limit Reached" : "Video Solution Locked"}
             </h3>
+
+            {/* Description */}
             <p className="text-slate-300 text-xs mb-4">
-              Unlock this video solution to watch the detailed explanation and
-              approach for this problem.
+              {videoLimitReached 
+                ? "You have used all your free video unlocks for today. Upgrade to Premium for unlimited access." 
+                : "Unlock this video solution to watch the detailed explanation and approach for this problem."}
             </p>
-            <div className="bg-slate-800/50 rounded-lg p-3 mb-4 border border-slate-700">
+
+            {/* Credit Info Box */}
+            <div className={`rounded-lg p-3 mb-4 border ${videoLimitReached ? "bg-red-500/10 border-red-500/30" : "bg-slate-800/50 border-slate-700"}`}>
               <div className="flex items-center justify-center gap-2 mb-1">
-                <Zap className="text-cyan-400" size={16} />
+                <Zap className={videoLimitReached ? "text-red-400" : "text-cyan-400"} size={16} />
                 <span className="text-xs font-semibold text-white">
-                  1 Credit Required
+                  {videoLimitReached ? "0 Credits Available" : "1 Credit Required"}
                 </span>
               </div>
               <div className="text-xs text-slate-400">
                 You have{" "}
-                <span className="text-cyan-400 font-bold">
+                <span className={`${videoLimitReached ? "text-red-400" : "text-cyan-400"} font-bold`}>
                   {usageLimits?.videoSolutionViews?.remaining || 0}
                 </span>{" "}
                 credits available
               </div>
             </div>
-            <button
-              onClick={handleUnlockVideo}
-              disabled={unlocking}
-              className={`w-full py-2 px-4 rounded-md text-white text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-2 mb-2 ${
-                unlocking
-                  ? "bg-slate-600 cursor-not-allowed"
-                  : "bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 shadow-lg shadow-cyan-500/20"
-              }`}
-            >
-              {unlocking ? (
-                <>
-                  <div className="animate-spin">⚙️</div> Unlocking...
-                </>
-              ) : (
-                <>
-                  <Zap size={16} /> Unlock with 1 Credit
-                </>
-              )}
-            </button>
+
+            {/* Buttons */}
+            {!videoLimitReached && (
+                <button
+                onClick={handleUnlockVideo}
+                disabled={unlocking}
+                className={`w-full py-2 px-4 rounded-md text-white text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-2 mb-2 ${
+                    unlocking
+                    ? "bg-slate-600 cursor-not-allowed"
+                    : "bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 shadow-lg shadow-cyan-500/20"
+                }`}
+                >
+                {unlocking ? (
+                    <>
+                    <div className="animate-spin">⚙️</div> Unlocking...
+                    </>
+                ) : (
+                    <>
+                    <Zap size={16} /> Unlock with 1 Credit
+                    </>
+                )}
+                </button>
+            )}
+
             <button
               onClick={() => setShowPaywall(true)}
-              className="w-full py-2 px-4 rounded-md text-cyan-400 text-xs font-semibold border border-cyan-500/50 hover:border-cyan-400/80 hover:bg-cyan-400/10 transition-all flex items-center justify-center gap-2"
+              className={`w-full py-2 px-4 rounded-md text-xs font-semibold border transition-all flex items-center justify-center gap-2 ${
+                  videoLimitReached 
+                  ? "bg-cyan-500 text-white border-cyan-500 hover:bg-cyan-600" 
+                  : "text-cyan-400 border-cyan-500/50 hover:border-cyan-400/80 hover:bg-cyan-400/10"
+              }`}
             >
               <Crown size={16} />
-              Upgrade to Premium
+              {videoLimitReached ? "Upgrade to Unlock Now" : "Upgrade to Premium"}
             </button>
           </div>
         </div>
       )}
 
+      {/* Paywall Modal is kept at the end */}
       <PaywallModal
         isOpen={showPaywall}
         onClose={() => setShowPaywall(false)}
