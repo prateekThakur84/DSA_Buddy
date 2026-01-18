@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router";
 import {
   Plus,
@@ -11,6 +11,8 @@ import {
   FileText,
   Settings,
   Hash,
+  FileJson, // Imported FileJson icon
+  Upload    // Imported Upload icon
 } from "lucide-react";
 import axiosClient from "../../utils/axiosClient";
 
@@ -19,6 +21,10 @@ const AdminPanel = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
+
+  // New State for JSON Import feature
+  const [showJsonInput, setShowJsonInput] = useState(false);
+  const [jsonInput, setJsonInput] = useState("");
 
   const [problemData, setProblemData] = useState({
     title: "",
@@ -41,14 +47,58 @@ const AdminPanel = () => {
 
   const availableTags = [
     "array",
-    "linkedList", 
+    "linkedList",
     "graph",
     "dp",
     "string",
     "hash table",
-    "math"
+    "math",
+    "bit-manipulation" // Added based on your example
   ];
 
+  // --- JSON IMPORT HANDLER ---
+  const handleJsonImport = () => {
+    try {
+      if (!jsonInput.trim()) {
+        setError("Please paste a JSON string.");
+        return;
+      }
+
+      const parsedData = JSON.parse(jsonInput);
+
+      // Basic validation to ensure it matches our schema
+      if (!parsedData.title || !parsedData.description) {
+        throw new Error("JSON must contain at least a 'title' and 'description'.");
+      }
+
+      // Merge parsed data with default structure to ensure all fields exist
+      // We map specifically to ensure arrays are processed correctly
+      setProblemData(prev => ({
+        ...prev,
+        ...parsedData,
+        // Ensure arrays exist even if not in JSON, or use the JSON version
+        tags: parsedData.tags || [],
+        visibleTestCases: parsedData.visibleTestCases || prev.visibleTestCases,
+        hiddenTestCases: parsedData.hiddenTestCases || prev.hiddenTestCases,
+        startCode: parsedData.startCode || prev.startCode,
+        referenceSolution: parsedData.referenceSolution || prev.referenceSolution
+      }));
+
+      setSuccess("Problem data imported successfully!");
+      setShowJsonInput(false);
+      setJsonInput(""); // Clear input
+      setError("");
+      
+      // Clear success msg after 3s
+      setTimeout(() => setSuccess(""), 3000);
+
+    } catch (err) {
+      console.error(err);
+      setError("Invalid JSON Format. Please check syntax.");
+    }
+  };
+
+  // --- EXISTING HANDLERS ---
   const handleInputChange = (field, value) => {
     setProblemData((prev) => ({
       ...prev,
@@ -177,9 +227,9 @@ const AdminPanel = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4"
         >
-          <div className="flex items-center space-x-3 mb-4">
+          <div className="flex items-center space-x-3">
             <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl">
               <Plus className="w-6 h-6 text-white" />
             </div>
@@ -188,11 +238,69 @@ const AdminPanel = () => {
                 Create New Problem
               </h1>
               <p className="text-gray-300">
-                Add a new coding problem to the platform
+                Add a new coding problem manually or via JSON 
+
+[Image of JSON logo]
+
               </p>
             </div>
           </div>
+
+          {/* JSON Import Toggle Button */}
+          <button
+            onClick={() => setShowJsonInput(!showJsonInput)}
+            className="flex items-center space-x-2 px-4 py-2 bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30 text-purple-300 rounded-lg transition-all duration-200"
+          >
+            <FileJson className="w-5 h-5" />
+            <span>{showJsonInput ? "Hide Importer" : "Import JSON"}</span>
+          </button>
         </motion.div>
+
+        {/* JSON Import Section */}
+        <AnimatePresence>
+          {showJsonInput && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden mb-8"
+            >
+              <div className="bg-black/40 backdrop-blur-lg border border-purple-500/30 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-purple-300 mb-2 flex items-center">
+                  <Upload className="w-5 h-5 mr-2" />
+                  Paste JSON Data
+                </h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  Paste the problem JSON structure here to auto-fill the form fields.
+                </p>
+                <textarea
+                  value={jsonInput}
+                  onChange={(e) => setJsonInput(e.target.value)}
+                  rows="10"
+                  className="w-full px-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-green-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4"
+                  placeholder='{ "title": "...", "description": "...", ... }'
+                />
+                <div className="flex justify-end space-x-3">
+                  <button
+                     type="button"
+                     onClick={() => { setShowJsonInput(false); setJsonInput(""); }}
+                     className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleJsonImport}
+                    className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium flex items-center"
+                  >
+                    <FileJson className="w-4 h-4 mr-2" />
+                    Parse & Fill Form
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Information */}

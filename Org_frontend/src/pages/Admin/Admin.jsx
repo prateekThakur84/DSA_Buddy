@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router';
+import { Link } from 'react-router'; // Ensure this matches your router version (react-router-dom usually)
 import { 
   Plus, 
   Trash2, 
@@ -133,17 +133,17 @@ const Admin = () => {
           className="mb-8"
         >
           <div className="flex items-center space-x-3 mb-4">
-            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl">
+            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl shadow-lg shadow-cyan-900/20">
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-              <p className="text-gray-300">Manage your DSA platform</p>
+              <p className="text-gray-400">Manage your DSA platform</p>
             </div>
           </div>
         </motion.div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Grid ensures equal height */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -155,47 +155,50 @@ const Admin = () => {
             return (
               <div
                 key={index}
-                className={`bg-black/20 backdrop-blur-lg border rounded-xl p-6 ${stat.bgColor}`}
+                className={`bg-black/20 backdrop-blur-lg border rounded-xl p-6 ${stat.bgColor} h-full flex flex-col justify-center`}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-300 text-sm">{stat.title}</p>
+                    <p className="text-gray-400 text-sm font-medium mb-1">{stat.title}</p>
                     <p className={`text-3xl font-bold ${stat.color}`}>
                       {stat.value.toLocaleString()}
                     </p>
                   </div>
-                  <Icon className={`w-8 h-8 ${stat.color}`} />
+                  <div className={`p-3 rounded-lg bg-white/5 ${stat.color}`}>
+                     <Icon className="w-8 h-8" />
+                  </div>
                 </div>
               </div>
             );
           })}
         </motion.div>
 
-        {/* Admin Actions */}
+        {/* Admin Actions - Grid ensures uniform boxes */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
           className="mb-8"
         >
-          <h2 className="text-xl font-semibold text-white mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <h2 className="text-xl font-semibold text-white mb-6 pl-1">Quick Actions</h2>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {adminActions.map((action, index) => {
               const Icon = action.icon;
               return (
-                <Link key={index} to={action.path}>
+                <Link key={index} to={action.path} className="block h-full">
                   <motion.div
-                    className={`bg-black/20 backdrop-blur-lg border rounded-xl p-6 hover:bg-black/30 transition-all duration-300 group cursor-pointer ${action.bgColor}`}
+                    className={`bg-black/20 backdrop-blur-lg border rounded-xl p-6 hover:bg-black/30 transition-all duration-300 group cursor-pointer ${action.bgColor} h-full flex flex-col`}
                     whileHover={{ scale: 1.02, y: -5 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <div className={`w-12 h-12 bg-gradient-to-br ${action.color} rounded-lg flex items-center justify-center mb-4 group-hover:shadow-lg transition-all duration-300`}>
+                    <div className={`w-12 h-12 bg-gradient-to-br ${action.color} rounded-lg flex items-center justify-center mb-4 group-hover:shadow-lg transition-all duration-300 shadow-lg shadow-black/50`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-cyan-100 transition-colors">
+                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-cyan-100 transition-colors">
                       {action.title}
                     </h3>
-                    <p className="text-gray-300 text-sm group-hover:text-gray-200 transition-colors">
+                    <p className="text-gray-400 text-sm group-hover:text-gray-300 transition-colors flex-grow leading-relaxed">
                       {action.description}
                     </p>
                   </motion.div>
@@ -205,7 +208,7 @@ const Admin = () => {
           </div>
         </motion.div>
 
-        {/* Recent Activity */}
+        {/* Platform Overview */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -216,27 +219,29 @@ const Admin = () => {
             <Settings className="w-5 h-5 mr-2 text-cyan-400" />
             Platform Overview
           </h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 border-b border-gray-700/30 last:border-b-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
               <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-gray-300">System Status</span>
+                <div className="w-2.5 h-2.5 bg-green-400 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.5)]"></div>
+                <span className="text-gray-300 font-medium">System Status</span>
               </div>
-              <span className="text-green-400 font-medium">Operational</span>
+              <span className="text-green-400 font-bold text-sm tracking-wide">OPERATIONAL</span>
             </div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-700/30 last:border-b-0">
+            
+            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
               <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
-                <span className="text-gray-300">Database</span>
+                <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.5)]"></div>
+                <span className="text-gray-300 font-medium">Database</span>
               </div>
-              <span className="text-cyan-400 font-medium">Connected</span>
+              <span className="text-cyan-400 font-bold text-sm tracking-wide">CONNECTED</span>
             </div>
-            <div className="flex items-center justify-between py-3 border-b border-gray-700/30 last:border-b-0">
+
+            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
               <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                <span className="text-gray-300">Code Execution</span>
+                <div className="w-2.5 h-2.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(96,165,250,0.5)]"></div>
+                <span className="text-gray-300 font-medium">Code Execution</span>
               </div>
-              <span className="text-blue-400 font-medium">Active</span>
+              <span className="text-blue-400 font-bold text-sm tracking-wide">ACTIVE</span>
             </div>
           </div>
         </motion.div>

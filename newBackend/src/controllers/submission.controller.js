@@ -1,3 +1,4 @@
+const { incrementFeatureUsageUtil } = require("../middleware/usage.middleware");
 const Problem = require("../models/problem.model");
 const Submission = require("../models/submission.model");
 const User = require("../models/user.model");

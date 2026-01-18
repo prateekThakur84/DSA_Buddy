@@ -6,14 +6,14 @@ import {
   Mail, 
   Trophy, 
   CheckCircle, 
-  Clock, 
   Code, 
   BarChart3,
   Edit,
-  Settings,
   Star,
   Calendar,
-  Target
+  Target,
+  Crown,
+  Hash
 } from 'lucide-react';
 import { Link } from 'react-router';
 import axiosClient from '../../utils/axiosClient';
@@ -25,8 +25,7 @@ const UserProfile = () => {
     totalSolved: 0,
     easy: 0,
     medium: 0,
-    hard: 0,
-    recentSubmissions: []
+    hard: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -46,14 +45,14 @@ const UserProfile = () => {
       
       // Calculate stats
       const difficultyStats = solvedResponse.data.reduce((acc, problem) => {
-        acc[problem.difficulty.toLowerCase()]++;
+        const diff = problem.difficulty?.toLowerCase() || 'easy';
+        acc[diff] = (acc[diff] || 0) + 1;
         return acc;
       }, { easy: 0, medium: 0, hard: 0 });
       
       setStats({
         totalSolved: solvedResponse.data.length,
-        ...difficultyStats,
-        recentSubmissions: [] // We could fetch recent submissions here if needed
+        ...difficultyStats
       });
       
     } catch (error) {
@@ -73,30 +72,19 @@ const UserProfile = () => {
   };
 
   const getInitials = () => {
-  if (user?.firstName && user?.lastName) {
-    // Take first letter of first and last name
-    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
-  } 
-  if (user?.firstName) {
-    // If only firstName exists, take first two letters (or first letter if only 1)
-    return user.firstName.slice(0, 2).toUpperCase();
-  } 
-  if (user?.email) {
-    // Extract initials from email before @
-    const emailName = user.email.split('@')[0]; // "john.doe"
-    const parts = emailName.split(/[\._\-]/); // split by dot, underscore, hyphen
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase(); // JD
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    } 
+    if (user?.firstName) {
+      return user.firstName.slice(0, 2).toUpperCase();
     }
-    return emailName.slice(0, 2).toUpperCase(); // fallback, first two letters
-  }
-  return 'U';
-};
-
-
-  
+    // Fallback to emailId if names are missing
+    const email = user?.emailId || "";
+    return email.slice(0, 2).toUpperCase() || 'U';
+  };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -150,53 +138,64 @@ const UserProfile = () => {
                   </span>
                 </div>
               )}
+              {/* Role Badge */}
               {user?.role === 'admin' && (
-                <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full p-1">
+                <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full p-1.5 border-2 border-black" title="Admin">
                   <Star className="w-4 h-4 text-white" />
                 </div>
               )}
             </div>
 
             {/* User Info */}
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-2">
-                <h1 className="text-3xl font-bold text-white">
-                  {user?.firstName && user?.lastName 
-                    ? `${user.firstName} ${user.lastName}`
-                    : user?.firstName || 'User'
-                  }
+            <div className="flex-1 w-full">
+              <div className="flex flex-wrap items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-white capitalize">
+                  {user?.firstName} {user?.lastName}
                 </h1>
-                {user?.role === 'admin' && (
-                  <span className="inline-block px-3 py-1 bg-gradient-to-r from-cyan-500 to-blue-500 text-sm text-white rounded-full">
-                    Admin
+                
+                {/* Subscription Badge */}
+                {user?.subscriptionTier === 'premium' ? (
+                  <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-amber-400 to-orange-500 text-xs font-bold text-black rounded-full">
+                    <Crown className="w-3 h-3 mr-1" />
+                    PREMIUM
+                  </span>
+                ) : (
+                   <span className="inline-flex items-center px-3 py-1 bg-gray-700 text-xs font-bold text-gray-300 rounded-full">
+                    FREE TIER
                   </span>
                 )}
               </div>
-              <div className="flex items-center space-x-2 text-gray-300 mb-4">
-                <Mail className="w-4 h-4" />
-                <span>{user?.email}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-gray-400 text-sm">
-                <Calendar className="w-4 h-4" />
-                <span>Joined {formatDate(user?.createdAt)}</span>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-2 gap-x-6 text-sm">
+                <div className="flex items-center space-x-2 text-gray-300">
+                  <Mail className="w-4 h-4 text-cyan-400" />
+                  <span>{user?.emailId}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-gray-300">
+                  <Calendar className="w-4 h-4 text-cyan-400" />
+                  <span>Joined {formatDate(user?.createdAt)}</span>
+                </div>
+                {user?.age && (
+                  <div className="flex items-center space-x-2 text-gray-300">
+                    <User className="w-4 h-4 text-cyan-400" />
+                    <span>Age: {user.age}</span>
+                  </div>
+                )}
+                <div className="flex items-center space-x-2 text-gray-300">
+                  <Hash className="w-4 h-4 text-cyan-400" />
+                  <span className="capitalize">Role: {user?.role || 'User'}</span>
+                </div>
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions - Settings Removed */}
             <div className="flex space-x-3">
               <Link
                 to="/profile/edit"
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg transition-all duration-200"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg transition-all duration-200 shadow-lg shadow-cyan-500/20"
               >
                 <Edit className="w-4 h-4" />
                 <span>Edit Profile</span>
-              </Link>
-              <Link
-                to="/settings"
-                className="flex items-center space-x-2 px-4 py-2 bg-black/30 border border-cyan-400/20 hover:bg-black/50 text-gray-300 hover:text-white rounded-lg transition-all duration-200"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
               </Link>
             </div>
           </div>
@@ -242,7 +241,7 @@ const UserProfile = () => {
           </div>
         </motion.div>
 
-        {/* Solved Problems */}
+        {/* Solved Problems List */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -258,9 +257,9 @@ const UserProfile = () => {
 
           {solvedProblems.length === 0 ? (
             <div className="text-center py-16">
-              <Code className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <Code className="w-16 h-16 text-gray-400 mx-auto mb-4 opacity-50" />
               <h3 className="text-xl font-semibold text-gray-300 mb-2">No problems solved yet</h3>
-              <p className="text-gray-400 mb-4">Start solving problems to see them here</p>
+              <p className="text-gray-400 mb-6">Start solving problems to build your profile.</p>
               <Link
                 to="/problems"
                 className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg transition-all duration-200"
@@ -277,24 +276,26 @@ const UserProfile = () => {
                     key={problem._id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    transition={{ delay: index * 0.05 }}
                     className="group"
                   >
                     <Link to={`/problem/${problem._id}`}>
-                      <div className="bg-black/30 border border-gray-700/30 rounded-lg p-4 hover:bg-black/50 hover:border-cyan-400/30 transition-all duration-200">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-white font-medium group-hover:text-cyan-100 transition-colors text-sm">
+                      <div className="bg-black/30 border border-gray-700/30 rounded-lg p-4 hover:bg-black/50 hover:border-cyan-400/30 transition-all duration-200 h-full flex flex-col justify-between">
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="text-white font-medium group-hover:text-cyan-100 transition-colors text-sm line-clamp-1">
                             {problem.title}
                           </h3>
                           <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 ml-2" />
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(problem.difficulty)}`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getDifficultyColor(problem.difficulty)}`}>
                             {problem.difficulty}
                           </span>
-                          <span className="inline-block px-2 py-1 bg-cyan-400/10 text-cyan-300 text-xs rounded-full border border-cyan-400/20">
-                            {problem.tags}
-                          </span>
+                          {problem.tags && problem.tags.length > 0 && (
+                             <span className="inline-block px-2 py-0.5 bg-cyan-400/10 text-cyan-300 text-[10px] rounded border border-cyan-400/20 truncate max-w-[120px]">
+                              {Array.isArray(problem.tags) ? problem.tags[0] : problem.tags}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Link>

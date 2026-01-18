@@ -58,6 +58,9 @@ const ProblemPage = () => {
     
     if (id) {
       console.log("✅ ID exists, fetching problem...");
+
+      dispatch(clearRunResult());
+      dispatch(clearSubmitResult());
       
       dispatch(setCurrentProblem(id));
       dispatch(fetchProblemById(id)); // ✅ THIS SHOULD TRIGGER API CALL
@@ -173,6 +176,7 @@ const ProblemPage = () => {
               onRunCode={handleRunCode}
               onSubmitCode={handleSubmitCode}
               onResetCode={handleResetCode}
+              problemId={id}
             />
           </Panel>
         </PanelGroup>

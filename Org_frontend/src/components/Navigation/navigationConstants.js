@@ -29,13 +29,6 @@ export const PROFILE_DROPDOWN_ITEMS = [
     description: 'View and edit your profile'
   },
   { 
-    id: 'settings', 
-    label: 'Settings', 
-    icon: Settings, 
-    path: '/settings',
-    description: 'Account preferences'
-  },
-  { 
     id: 'edit-profile', 
     label: 'Edit Profile', 
     icon: Edit, 

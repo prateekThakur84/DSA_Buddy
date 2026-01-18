@@ -16,7 +16,8 @@ const RightPanel = ({
   submitResult,
   onRunCode,
   onSubmitCode,
-  onResetCode
+  onResetCode,
+  problemId
 }) => {
   return (
     <div className="h-full bg-gray-900">
@@ -66,6 +67,7 @@ const RightPanel = ({
               runResult={runResult}
               submitResult={submitResult}
               loading={loading}
+              questionId={problemId}
             />
           </motion.div>
         </Panel>

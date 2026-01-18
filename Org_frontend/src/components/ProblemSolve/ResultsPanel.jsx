@@ -14,9 +14,15 @@ import {
   Terminal
 } from 'lucide-react';
 
-const ResultsPanel = ({ runResult, submitResult, loading }) => {
+const ResultsPanel = ({ runResult, submitResult, loading, questionId }) => {
   const [activeTab, setActiveTab] = useState('run');
   const [expandedTestCase, setExpandedTestCase] = useState(null);
+
+  // ✅ FIX: Reset internal state when the question changes
+  useEffect(() => {
+    setActiveTab('run');
+    setExpandedTestCase(null);
+  }, [questionId]);
 
   // Always show tabs at top
   const renderTabs = () => (

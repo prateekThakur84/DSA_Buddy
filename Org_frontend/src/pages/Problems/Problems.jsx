@@ -26,11 +26,10 @@ const Problems = () => {
   // Redux state
   const dispatch = useDispatch();
   const { problems, solvedProblems, loading, error } = useSelector(
-    (state) => state.problems
+    (state) => state.problems,
   );
 
   console.log(problems);
-  
 
   // Local UI state
   const [searchTerm, setSearchTerm] = useState("");
@@ -209,7 +208,7 @@ const Problems = () => {
                   <p className="text-2xl font-bold text-white">
                     {problems.length > 0
                       ? Math.round(
-                          (solvedProblems.length / problems.length) * 100
+                          (solvedProblems.length / problems.length) * 100,
                         )
                       : 0}
                     %
@@ -330,7 +329,7 @@ const Problems = () => {
                   <div className="flex items-center justify-between mb-4">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(
-                        problem.difficulty
+                        problem.difficulty,
                       )}`}
                     >
                       {problem.difficulty}
@@ -338,9 +337,14 @@ const Problems = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 bg-cyan-400/10 text-cyan-300 text-xs rounded-full border border-cyan-400/20">
-                      {problem.tags}
-                    </span>
+                    {problem.tags?.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-cyan-400/10 text-cyan-300 text-xs rounded-full border border-cyan-400/20 capitalize"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </Link>

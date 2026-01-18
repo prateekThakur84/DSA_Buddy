@@ -28,8 +28,8 @@ const AdminDelete = () => {
   useEffect(() => {
     setFilteredProblems(
       problems.filter((problem) =>
-        problem.title.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+        problem.title.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
     );
   }, [problems, searchTerm]);
 
@@ -49,7 +49,7 @@ const AdminDelete = () => {
   const handleDelete = async (problemId, problemTitle) => {
     if (
       !window.confirm(
-        `Are you sure you want to delete "${problemTitle}"? This action cannot be undone.`
+        `Are you sure you want to delete "${problemTitle}"? This action cannot be undone.`,
       )
     ) {
       return;
@@ -239,16 +239,23 @@ const AdminDelete = () => {
                       <td className="px-6 py-4">
                         <span
                           className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(
-                            problem.difficulty
+                            problem.difficulty,
                           )}`}
                         >
                           {problem.difficulty}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-block px-2 py-1 bg-cyan-400/10 text-cyan-300 text-xs rounded-full border border-cyan-400/20">
-                          {problem.tags}
-                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {problem.tags?.map((tag, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-cyan-400/10 text-cyan-300 text-xs rounded-full border border-cyan-400/20 capitalize"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <Link
