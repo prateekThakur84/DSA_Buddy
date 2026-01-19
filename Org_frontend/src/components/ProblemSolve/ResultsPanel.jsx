@@ -11,487 +11,330 @@ import {
   AlertTriangle,
   Bug,
   Code2,
-  Terminal
+  Terminal,
+  Play
 } from 'lucide-react';
 
 const ResultsPanel = ({ runResult, submitResult, loading, questionId }) => {
   const [activeTab, setActiveTab] = useState('run');
   const [expandedTestCase, setExpandedTestCase] = useState(null);
 
-  // ✅ FIX: Reset internal state when the question changes
+  // Reset state when problem changes
   useEffect(() => {
     setActiveTab('run');
     setExpandedTestCase(null);
   }, [questionId]);
 
-  // Always show tabs at top
+  // If a submit result comes in, switch to submit tab automatically
+  useEffect(() => {
+    if (submitResult) setActiveTab('submit');
+  }, [submitResult]);
+
+  const result = activeTab === 'run' ? runResult : submitResult;
+
+  // --- Render Tabs ---
   const renderTabs = () => (
-    <div className="flex border-b border-gray-700 bg-gray-900/50 sticky top-0 z-20">
+    <div className="flex items-center border-b border-[#30363d] bg-[#0d1117] sticky top-0 z-20">
       <button
-        onClick={() => {
-          setActiveTab('run');
-          setExpandedTestCase(null);
-        }}
-        className={`flex-1 px-4 py-2 text-sm font-medium text-center transition-colors focus:outline-none ${
+        onClick={() => { setActiveTab('run'); setExpandedTestCase(null); }}
+        className={`flex-1 px-4 py-3 text-xs font-semibold text-center transition-all relative outline-none ${
           activeTab === 'run'
-            ? 'text-cyan-400 border-b-2 border-cyan-400 bg-gray-800'
-            : 'text-gray-400 hover:text-white'
+            ? 'text-cyan-400 bg-[#161b22]'
+            : 'text-gray-500 hover:text-gray-300 hover:bg-[#161b22]/50'
         }`}
       >
-        Run Results
+        Run Code
+        {activeTab === 'run' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />}
       </button>
       <button
-        onClick={() => {
-          setActiveTab('submit');
-          setExpandedTestCase(null);
-        }}
-        className={`flex-1 px-4 py-2 text-sm font-medium text-center transition-colors focus:outline-none ${
+        onClick={() => { setActiveTab('submit'); setExpandedTestCase(null); }}
+        className={`flex-1 px-4 py-3 text-xs font-semibold text-center transition-all relative outline-none ${
           activeTab === 'submit'
-            ? 'text-cyan-400 border-b-2 border-cyan-400 bg-gray-800'
-            : 'text-gray-400 hover:text-white'
+            ? 'text-green-400 bg-[#161b22]'
+            : 'text-gray-500 hover:text-gray-300 hover:bg-[#161b22]/50'
         }`}
       >
-        Submit Results
+        Submit
+        {activeTab === 'submit' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-400" />}
       </button>
     </div>
   );
 
-  const result = activeTab === 'run' ? runResult : submitResult;
-
-  // Loading state
+  // --- LOADING STATE ---
   if (loading) {
     return (
-      <div className="h-full bg-gray-800/30 backdrop-blur-sm flex flex-col">
+      <div className="h-full bg-[#0d1117] flex flex-col">
         {renderTabs()}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+          <div className="relative w-16 h-16">
+             <div className="absolute inset-0 border-4 border-[#30363d] rounded-full"></div>
+             <div className="absolute inset-0 border-4 border-cyan-400 rounded-full border-t-transparent animate-spin"></div>
+             <Play className="absolute inset-0 m-auto text-cyan-400 w-6 h-6 fill-cyan-400/20" />
+          </div>
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto mb-2" />
-            <p className="text-gray-400">Running your code...</p>
+             <h3 className="text-sm font-semibold text-gray-200">Executing Code...</h3>
+             <p className="text-xs text-gray-500 mt-1">Running test cases against your solution</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // No result yet
+  // --- EMPTY STATE ---
   if (!result) {
     return (
-      <div className="h-full bg-gray-800/30 backdrop-blur-sm flex flex-col">
+      <div className="h-full bg-[#0d1117] flex flex-col">
         {renderTabs()}
-        <div className="flex-1 p-4 text-center text-gray-400">
-          <TestTube size={48} className="mx-auto mb-2" />
-          <p>No results yet. Run or submit your code to see results.</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-500">
+          <div className="w-16 h-16 bg-[#161b22] rounded-full flex items-center justify-center border border-[#30363d] mb-4">
+             <Terminal size={28} className="opacity-50" />
+          </div>
+          <h3 className="text-sm font-medium text-gray-300">Ready to Run</h3>
+          <p className="text-xs mt-1 max-w-[200px]">Write your code and click Run or Submit to see the output here.</p>
         </div>
       </div>
     );
   }
 
-  // Check for compilation/syntax errors
+  // --- ERROR HANDLING ---
   const hasCompilationError = result.errorType === 'compilation' || result.errorType === 'syntax';
   const hasRuntimeError = result.errorType === 'runtime';
-  const hasTimeoutError = result.errorType === 'timeout';
+  const hasTimeoutError = result.errorType === 'timeout' || result.errorType === 'time_limit_exceeded'; // Handle variant naming
   const hasMemoryError = result.errorType === 'memory_limit';
 
-  // Render compilation/syntax error
   if (hasCompilationError) {
     return (
-      <div className="h-full bg-gray-800/30 backdrop-blur-sm flex flex-col">
+      <div className="h-full bg-[#0d1117] flex flex-col">
         {renderTabs()}
-        <div className="p-4 overflow-auto flex-1">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/10 border-2 border-red-500/50 rounded-lg p-4 mb-4"
-          >
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 p-2 bg-red-500/20 rounded-lg">
-                <Code2 className="text-red-400" size={24} />
+        <div className="p-4 overflow-auto flex-1 custom-scrollbar">
+          <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-500/10 rounded-lg text-red-400">
+                <Code2 size={20} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-red-400 mb-2 flex items-center">
-                  <AlertTriangle size={20} className="mr-2" />
-                  Compilation Error
-                </h3>
-                <p className="text-sm text-gray-300 mb-3">
-                  Your code has syntax or compilation errors. Please fix them before running.
-                </p>
-
-                {/* Error Message Box */}
-                <div className="bg-gray-900/80 rounded-lg p-4 border border-red-500/30">
-                  <div className="flex items-center mb-2">
-                    <Terminal size={16} className="text-red-400 mr-2" />
-                    <span className="text-xs font-semibold text-red-400 uppercase tracking-wide">
-                      Compiler Output
-                    </span>
-                  </div>
-                  <pre className="text-xs font-mono text-red-300 whitespace-pre-wrap break-words leading-relaxed">
-{result.errorMessage || 'Unknown compilation error'}
-                  </pre>
+                <h3 className="text-sm font-bold text-red-400 mb-1">Compilation Error</h3>
+                <p className="text-xs text-gray-400 mb-3">Your code failed to compile. Check for syntax errors.</p>
+                
+                <div className="bg-[#010409] border border-red-500/20 rounded-md p-3 font-mono text-xs text-red-300 whitespace-pre-wrap overflow-x-auto">
+                   {result.errorMessage || 'Unknown compilation error'}
                 </div>
 
-                {/* Line number extraction if available */}
                 {result.errorLine && (
-                  <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-                    <p className="text-sm text-yellow-300">
-                      <span className="font-semibold">Error at line {result.errorLine}</span>
-                      {result.errorColumn && <span> : column {result.errorColumn}</span>}
-                    </p>
-                  </div>
+                   <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 text-yellow-400 text-xs rounded border border-yellow-500/20">
+                      <AlertTriangle size={12} />
+                      <span>Check Line {result.errorLine}{result.errorColumn ? `, Column ${result.errorColumn}` : ''}</span>
+                   </div>
                 )}
-
-                {/* Common fixes suggestion */}
-                <div className="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <h4 className="text-sm font-semibold text-blue-400 mb-2">💡 Common Fixes:</h4>
-                  <ul className="text-xs text-gray-300 space-y-1 list-disc list-inside">
-                    <li>Check for missing semicolons or brackets</li>
-                    <li>Verify variable declarations and types</li>
-                    <li>Ensure proper syntax for your language</li>
-                    <li>Check for typos in function/variable names</li>
-                  </ul>
-                </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Render runtime error
   if (hasRuntimeError) {
     return (
-      <div className="h-full bg-gray-800/30 backdrop-blur-sm flex flex-col">
+      <div className="h-full bg-[#0d1117] flex flex-col">
         {renderTabs()}
-        <div className="p-4 overflow-auto flex-1">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-orange-500/10 border-2 border-orange-500/50 rounded-lg p-4 mb-4"
-          >
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 p-2 bg-orange-500/20 rounded-lg">
-                <Bug className="text-orange-400" size={24} />
+        <div className="p-4 overflow-auto flex-1 custom-scrollbar">
+          <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-orange-500/10 rounded-lg text-orange-400">
+                <Bug size={20} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-orange-400 mb-2 flex items-center">
-                  <AlertTriangle size={20} className="mr-2" />
-                  Runtime Error
-                </h3>
-                <p className="text-sm text-gray-300 mb-3">
-                  Your code compiled successfully but encountered an error during execution.
-                </p>
-
-                {/* Error Message Box */}
-                <div className="bg-gray-900/80 rounded-lg p-4 border border-orange-500/30">
-                  <div className="flex items-center mb-2">
-                    <Terminal size={16} className="text-orange-400 mr-2" />
-                    <span className="text-xs font-semibold text-orange-400 uppercase tracking-wide">
-                      Runtime Output
-                    </span>
-                  </div>
-                  <pre className="text-xs font-mono text-orange-300 whitespace-pre-wrap break-words leading-relaxed">
-{result.errorMessage || 'Unknown runtime error'}
-                  </pre>
+                <h3 className="text-sm font-bold text-orange-400 mb-1">Runtime Error</h3>
+                <p className="text-xs text-gray-400 mb-3">An error occurred during execution.</p>
+                
+                <div className="bg-[#010409] border border-orange-500/20 rounded-md p-3 font-mono text-xs text-orange-300 whitespace-pre-wrap overflow-x-auto">
+                   {result.errorMessage || 'Unknown runtime error'}
                 </div>
-
-                {/* Failed test case info */}
-                {result.failedTestCase && (
-                  <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-                    <p className="text-sm text-yellow-300">
-                      <span className="font-semibold">Failed at Test Case {result.failedTestCase}</span>
-                    </p>
-                  </div>
-                )}
-
-                {/* Common runtime error tips */}
-                <div className="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <h4 className="text-sm font-semibold text-blue-400 mb-2">💡 Common Runtime Errors:</h4>
-                  <ul className="text-xs text-gray-300 space-y-1 list-disc list-inside">
-                    <li>Index out of bounds / Array access error</li>
-                    <li>Null pointer / Undefined reference</li>
-                    <li>Division by zero</li>
-                    <li>Stack overflow (infinite recursion)</li>
-                    <li>Type conversion errors</li>
-                  </ul>
+                
+                <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg">
+                   <h4 className="text-xs font-semibold text-blue-400 mb-2">Common Causes:</h4>
+                   <ul className="text-xs text-gray-400 list-disc list-inside space-y-1">
+                      <li>Index out of bounds</li>
+                      <li>Accessing null/undefined properties</li>
+                      <li>Infinite recursion (Stack Overflow)</li>
+                      <li>Division by zero</li>
+                   </ul>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Render timeout error
   if (hasTimeoutError) {
-    return (
-      <div className="h-full bg-gray-800/30 backdrop-blur-sm flex flex-col">
+     return (
+      <div className="h-full bg-[#0d1117] flex flex-col">
         {renderTabs()}
-        <div className="p-4 overflow-auto flex-1">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-lg p-4"
-          >
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 p-2 bg-yellow-500/20 rounded-lg">
-                <Clock className="text-yellow-400" size={24} />
+        <div className="p-4 overflow-auto flex-1 custom-scrollbar">
+          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-400">
+                <Clock size={20} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-yellow-400 mb-2">
-                  Time Limit Exceeded
-                </h3>
-                <p className="text-sm text-gray-300 mb-3">
-                  Your code took too long to execute and was terminated.
-                </p>
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <h4 className="text-sm font-semibold text-blue-400 mb-2">💡 Optimization Tips:</h4>
-                  <ul className="text-xs text-gray-300 space-y-1 list-disc list-inside">
-                    <li>Check for infinite loops</li>
-                    <li>Optimize your algorithm complexity</li>
-                    <li>Use more efficient data structures</li>
-                    <li>Avoid nested loops where possible</li>
-                  </ul>
+                <h3 className="text-sm font-bold text-yellow-400 mb-1">Time Limit Exceeded</h3>
+                <p className="text-xs text-gray-400 mb-3">Your code took too long to execute.</p>
+                
+                <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg">
+                   <h4 className="text-xs font-semibold text-blue-400 mb-2">Optimization Tips:</h4>
+                   <ul className="text-xs text-gray-400 list-disc list-inside space-y-1">
+                      <li>Check for infinite loops (while/for conditions)</li>
+                      <li>Reduce algorithmic complexity (e.g., O(n²) → O(n log n))</li>
+                      <li>Use more efficient data structures (Map/Set)</li>
+                   </ul>
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
-    );
+     );
   }
 
-  // Render memory limit error
-  if (hasMemoryError) {
-    return (
-      <div className="h-full bg-gray-800/30 backdrop-blur-sm flex flex-col">
-        {renderTabs()}
-        <div className="p-4 overflow-auto flex-1">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-purple-500/10 border-2 border-purple-500/50 rounded-lg p-4"
-          >
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0 p-2 bg-purple-500/20 rounded-lg">
-                <MemoryStick className="text-purple-400" size={24} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-purple-400 mb-2">
-                  Memory Limit Exceeded
-                </h3>
-                <p className="text-sm text-gray-300 mb-3">
-                  Your code used too much memory and was terminated.
-                </p>
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <h4 className="text-sm font-semibold text-blue-400 mb-2">💡 Memory Tips:</h4>
-                  <ul className="text-xs text-gray-300 space-y-1 list-disc list-inside">
-                    <li>Avoid creating unnecessary copies of data</li>
-                    <li>Use more memory-efficient data structures</li>
-                    <li>Clear unused variables</li>
-                    <li>Check for memory leaks</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
-  // Normal results rendering (no errors)
+  // --- SUCCESS / STANDARD OUTPUT ---
   const total = result.totalTestCases || 0;
   const passed = result.passedTestCases || 0;
   const percent = total ? Math.round((passed / total) * 100) : 0;
   const overallPassed = result.success && passed === total;
 
   return (
-    <div className="h-full bg-gray-800/30 backdrop-blur-sm flex flex-col">
+    <div className="h-full bg-[#0d1117] flex flex-col relative">
       {renderTabs()}
-      <div className="p-4 overflow-auto space-y-4 flex-1">
-        {/* Status Summary */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between p-4 bg-gray-700/50 border border-gray-600/30 rounded-lg">
-            <div className="flex items-center space-x-3">
-              {overallPassed ? (
-                <CheckCircle className="text-green-400" size={20} />
-              ) : (
-                <XCircle className="text-red-400" size={20} />
-              )}
-              <div>
-                <span className="font-medium text-white">
-                  {overallPassed ? 'Accepted' : 'Wrong Answer'}
-                </span>
-                <div className="text-sm text-gray-400">
-                  {passed}/{total} passed ({percent}%)
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4 text-sm text-gray-400">
-              <div className="flex items-center space-x-1">
-                <Clock size={14} />
-                <span>{(result.runtime * 1000).toFixed(2)} ms</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <MemoryStick size={14} />
-                <span>{result.memory} KB</span>
-              </div>
-            </div>
-          </div>
-          <div className="h-2 bg-gray-600 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 ${
-                overallPassed ? 'bg-green-400' : 'bg-cyan-400'
-              }`}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+        
+        {/* Status Card */}
+        <div>
+           <div className={`p-4 rounded-t-lg border-x border-t flex items-center justify-between ${
+               overallPassed 
+               ? "bg-green-500/5 border-green-500/20" 
+               : "bg-red-500/5 border-red-500/20"
+           }`}>
+               <div className="flex items-center gap-3">
+                   {overallPassed 
+                     ? <CheckCircle size={24} className="text-green-400" />
+                     : <XCircle size={24} className="text-red-400" />
+                   }
+                   <div>
+                       <h2 className={`text-base font-bold ${overallPassed ? "text-green-400" : "text-red-400"}`}>
+                           {overallPassed ? "Accepted" : "Wrong Answer"}
+                       </h2>
+                       <p className="text-xs text-gray-400">
+                           {passed}/{total} Test Cases Passed
+                       </p>
+                   </div>
+               </div>
+               
+               {/* Stats (Runtime/Memory) */}
+               <div className="text-right">
+                   <div className="flex items-center justify-end gap-1.5 text-xs text-gray-300">
+                       <Clock size={12} className="text-gray-500" />
+                       <span>{(result.runtime * 1000).toFixed(0)}ms</span>
+                   </div>
+                   <div className="flex items-center justify-end gap-1.5 text-xs text-gray-300 mt-1">
+                       <MemoryStick size={12} className="text-gray-500" />
+                       <span>{result.memory}KB</span>
+                   </div>
+               </div>
+           </div>
+           
+           {/* Progress Bar */}
+           <div className="h-1.5 w-full bg-[#161b22] rounded-b-lg overflow-hidden border-x border-b border-[#30363d]">
+               <div 
+                  className={`h-full transition-all duration-700 ease-out ${overallPassed ? "bg-green-500" : "bg-red-500"}`}
+                  style={{ width: `${percent}%` }}
+               />
+           </div>
         </div>
 
-        {/* Sample Test Case Accordion */}
+        {/* Test Cases List */}
         {result.results?.length > 0 && (
-          <div>
-            <h3 className="text-lg font-medium text-white mb-2">
-              Sample Test Case
-            </h3>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="border rounded-lg border-gray-600/30 bg-gray-700/50"
-            >
-              <button
-                onClick={() =>
-                  setExpandedTestCase(prev => (prev === 'sample' ? null : 'sample'))
-                }
-                className="w-full flex items-center justify-between p-3 hover:bg-gray-700/30 transition-colors focus:outline-none"
-              >
-                <div className="flex items-center space-x-3">
-                  <TestTube className="text-cyan-400" size={16} />
-                  <span className="font-medium text-white">Input / Expected</span>
-                </div>
-                {expandedTestCase === 'sample' ? (
-                  <ChevronDown className="text-gray-400" size={16} />
-                ) : (
-                  <ChevronRight className="text-gray-400" size={16} />
-                )}
-              </button>
-              <AnimatePresence>
-                {expandedTestCase === 'sample' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="px-3 pb-3 space-y-2 text-sm"
-                  >
-                    <div>
-                      <span className="text-gray-400 font-medium">Input:</span>
-                      <pre className="bg-gray-800/50 rounded p-2 mt-1 font-mono text-green-300">
-                        {result.results[0].input}
-                      </pre>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 font-medium">Expected:</span>
-                      <pre className="bg-gray-800/50 rounded p-2 mt-1 font-mono text-blue-300">
-                        {result.results[0].expectedOutput}
-                      </pre>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </div>
+            <div className="space-y-3">
+               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">Test Cases</h3>
+               
+               {result.results.map((tc, idx) => (
+                  <div key={idx} className={`border rounded-lg overflow-hidden transition-all duration-200 ${
+                      expandedTestCase === idx 
+                      ? "bg-[#161b22] border-gray-600" 
+                      : `bg-[#0d1117] ${tc.passed ? "border-green-900/30" : "border-red-900/30"}`
+                  }`}>
+                      <button
+                         onClick={() => setExpandedTestCase(prev => (prev === idx ? null : idx))}
+                         className="w-full flex items-center justify-between p-3 hover:bg-[#1c2128] transition-colors outline-none"
+                      >
+                          <div className="flex items-center gap-3">
+                              {tc.passed 
+                                ? <CheckCircle size={16} className="text-green-500" /> 
+                                : <XCircle size={16} className="text-red-500" />
+                              }
+                              <span className={`text-sm font-medium ${tc.passed ? "text-gray-300" : "text-red-300"}`}>
+                                  Test Case {tc.testCaseNumber}
+                              </span>
+                          </div>
+                          {expandedTestCase === idx ? <ChevronDown size={16} className="text-gray-500"/> : <ChevronRight size={16} className="text-gray-500"/>}
+                      </button>
+
+                      <AnimatePresence>
+                          {expandedTestCase === idx && (
+                              <motion.div
+                                 initial={{ height: 0, opacity: 0 }}
+                                 animate={{ height: "auto", opacity: 1 }}
+                                 exit={{ height: 0, opacity: 0 }}
+                                 className="border-t border-[#30363d] bg-[#010409]"
+                              >
+                                  <div className="p-3 grid gap-3 text-xs font-mono">
+                                      <div>
+                                          <span className="text-gray-500 block mb-1">Input:</span>
+                                          <div className="p-2 bg-[#0d1117] border border-[#30363d] rounded text-gray-300 whitespace-pre-wrap">
+                                              {tc.input}
+                                          </div>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-3">
+                                          <div>
+                                              <span className="text-gray-500 block mb-1">Expected Output:</span>
+                                              <div className="p-2 bg-[#0d1117] border border-[#30363d] rounded text-gray-300 whitespace-pre-wrap">
+                                                  {tc.expectedOutput}
+                                              </div>
+                                          </div>
+                                          <div>
+                                              <span className="text-gray-500 block mb-1">Your Output:</span>
+                                              <div className={`p-2 bg-[#0d1117] border rounded whitespace-pre-wrap ${
+                                                  tc.passed ? "text-green-300 border-green-900/30" : "text-red-300 border-red-900/30"
+                                              }`}>
+                                                  {tc.actualOutput}
+                                              </div>
+                                          </div>
+                                      </div>
+                                      {tc.error && (
+                                          <div className="p-2 bg-red-900/10 border border-red-900/30 rounded text-red-300">
+                                              <span className="font-bold">Error:</span> {tc.error}
+                                          </div>
+                                      )}
+                                  </div>
+                              </motion.div>
+                          )}
+                      </AnimatePresence>
+                  </div>
+               ))}
+            </div>
         )}
 
-        {/* Detailed Test Cases */}
-        {result.results?.length > 0 && (
-          <div>
-            <h3 className="text-lg font-medium text-white mb-2">Test Cases</h3>
-            <div className="space-y-2">
-              {result.results.map((tc, idx) => (
-                <motion.div
-                  key={tc.testCaseNumber}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className={`border rounded-lg ${
-                    tc.passed
-                      ? 'border-green-500/30 bg-green-500/10'
-                      : 'border-red-500/30 bg-red-500/10'
-                  }`}
-                >
-                  <button
-                    onClick={() =>
-                      setExpandedTestCase(prev => (prev === idx ? null : idx))
-                    }
-                    className="w-full flex items-center justify-between p-3 hover:bg-gray-700/30 transition-colors focus:outline-none"
-                  >
-                    <div className="flex items-center space-x-3">
-                      {tc.passed ? (
-                        <CheckCircle className="text-green-400" size={16} />
-                      ) : (
-                        <XCircle className="text-red-400" size={16} />
-                      )}
-                      <span className="font-medium text-white">
-                        Test Case {tc.testCaseNumber}
-                      </span>
-                      <span className="text-sm text-gray-400">
-                        {tc.passed ? 'Passed' : 'Failed'}
-                      </span>
-                    </div>
-                    {expandedTestCase === idx ? (
-                      <ChevronDown className="text-gray-400" size={16} />
-                    ) : (
-                      <ChevronRight className="text-gray-400" size={16} />
-                    )}
-                  </button>
-                  <AnimatePresence>
-                    {expandedTestCase === idx && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="px-3 pb-3 space-y-2 text-sm"
-                      >
-                        <div>
-                          <span className="text-gray-400 font-medium">Input:</span>
-                          <pre className="bg-gray-800/50 rounded p-2 font-mono text-green-300">
-                            {tc.input}
-                          </pre>
-                        </div>
-                        <div>
-                          <span className="text-gray-400 font-medium">Expected:</span>
-                          <pre className="bg-gray-800/50 rounded p-2 font-mono text-blue-300">
-                            {tc.expectedOutput}
-                          </pre>
-                        </div>
-                        <div>
-                          <span className="text-gray-400 font-medium">Your Output:</span>
-                          <pre
-                            className={`bg-gray-800/50 rounded p-2 font-mono ${
-                              tc.passed ? 'text-green-300' : 'text-red-300'
-                            }`}
-                          >
-                            {tc.actualOutput}
-                          </pre>
-                        </div>
-                        {tc.error && (
-                          <div>
-                            <span className="text-red-400 font-medium">Error:</span>
-                            <div className="bg-red-500/10 rounded p-2 font-mono text-red-300 text-xs">
-                              {tc.error}
-                            </div>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+      
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #484f58; }
+      `}</style>
     </div>
   );
 };

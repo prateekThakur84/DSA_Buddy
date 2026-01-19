@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Send, Bot, Loader, AlertCircle, Check, Copy, Crown, Lock } from "lucide-react";
+import { Send, Bot, Loader2, AlertTriangle, Check, Copy, Crown, Lock, Trash2, StopCircle, CornerDownLeft, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { motion, AnimatePresence } from "framer-motion";
 import axiosClient from "../../utils/axiosClient";
 import { useSubscription } from "../../hooks/useSubscription";
 import PaywallModal from "../common/PayWallModal";
@@ -14,31 +15,40 @@ const ChatAi = ({ problem }) => {
   const [error, setError] = useState("");
   const [copyStates, setCopyStates] = useState({});
   const [showPaywall, setShowPaywall] = useState(false);
-  const endRef = useRef(null);
   
-  // Get subscription status
+  const endRef = useRef(null);
+  const textareaRef = useRef(null);
+  
+  // Subscription Hooks
   const { isPremium, usageLimits, hasLimitReached } = useSubscription();
   const aiLimitReached = !isPremium && hasLimitReached('aiChatQueries');
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + 'px';
+    }
+  }, [input]);
+
+  // Scroll to bottom on new message
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
+  // Initial Welcome Message
   useEffect(() => {
     setMessages([
       {
-        from: "bot",
-        text: `Hello! I'm your DSA Tutor for **${problem?.title}**.\n\nAsk me for:\n- 💡 Hints and guidance\n- 🔍 Code review\n- 🎯 Optimal approaches\n- ⚡ Complexity analysis${
-          !isPremium ? `\n\n**Free Tier**: ${usageLimits?.aiChatQueries?.remaining || 0}/${usageLimits?.aiChatQueries?.limit || 10} AI queries remaining` : ''
-        }`,
+        from: "system",
+        text: `Hi! I'm your AI tutor for **${problem?.title}**. \n\nI can help with **Logic**, **Optimization**, or **Debugging**.\n${!isPremium ? `_(Free Plan: ${usageLimits?.aiChatQueries?.remaining || 0} queries left)_` : ''}`,
       },
     ]);
-  }, [problem, isPremium, usageLimits]);
+  }, [problem, isPremium]);
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
 
-    // Check limit before sending
     if (aiLimitReached) {
       setShowPaywall(true);
       return;
@@ -50,9 +60,12 @@ const ChatAi = ({ problem }) => {
     setLoading(true);
     setError("");
 
+    // Reset textarea height
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
     try {
       const { data } = await axiosClient.post("/ai/chat", {
-        messages: [...messages, userMsg],
+        messages: [...messages.filter(m => m.from !== 'system'), userMsg],
         problemContext: {
           title: problem.title,
           description: problem.description,
@@ -62,14 +75,12 @@ const ChatAi = ({ problem }) => {
       });
       setMessages((m) => [...m, { from: "bot", text: data.message }]);
     } catch (err) {
-      // Check if error is due to limit reached
       if (err.response?.status === 403 && err.response?.data?.limitReached) {
         setError(err.response.data.message);
         setShowPaywall(true);
       } else {
-        setError("AI request failed. Please try again.");
+        setError("Network error. Please try again.");
       }
-      console.error("Chat error:", err);
     } finally {
       setLoading(false);
     }
@@ -82,215 +93,215 @@ const ChatAi = ({ problem }) => {
     }
   };
 
-  const clearChat = () => {
-    setError("");
-    setMessages([
-      {
-        from: "bot",
-        text: `Chat cleared. How can I help with **${problem?.title}** now?`,
-      },
-    ]);
-  };
-
-  const handleCopy = (codeId, code) => {
-    navigator.clipboard
-      .writeText(code)
-      .then(() => {
-        setCopyStates((prev) => ({ ...prev, [codeId]: true }));
-        setTimeout(() => {
-          setCopyStates((prev) => ({ ...prev, [codeId]: false }));
-        }, 2000);
-      })
-      .catch((err) => {
-        console.error("Copy failed:", err);
-      });
+  const handleCopy = (codeId, text) => {
+    navigator.clipboard.writeText(text);
+    setCopyStates(p => ({ ...p, [codeId]: true }));
+    setTimeout(() => setCopyStates(p => ({ ...p, [codeId]: false })), 2000);
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 rounded-lg border border-slate-700">
-      {/* Header with Usage Info */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-900/50">
-        <div className="flex items-center space-x-2">
-          <Bot className="text-cyan-400" size={20} />
-          <span className="text-sm font-semibold text-white">AI Assistant</span>
-        </div>
+    <div className="flex flex-col h-full bg-[#0d1117] text-sm relative">
+      
+      {/* --- 1. Header (Unified Dark Blue/Cyan Theme) --- */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d] bg-[#0d1117] select-none">
         <div className="flex items-center gap-2">
-          {/* Usage Badge */}
-          {isPremium ? (
-            <div className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full px-3 py-1">
-              <Crown size={12} className="text-cyan-400" />
-              <span className="text-xs font-medium text-white">Unlimited</span>
-            </div>
-          ) : (
-            <div className={`flex items-center gap-1 rounded-full px-3 py-1 border text-xs font-medium ${
-              aiLimitReached 
-                ? 'bg-red-500/10 border-red-500/30 text-red-400' 
-                : usageLimits?.aiChatQueries?.remaining <= 2
-                  ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
-                  : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
-            }`}>
-              {usageLimits?.aiChatQueries?.remaining || 0}/{usageLimits?.aiChatQueries?.limit || 10}
-            </div>
-          )}
-          
-          <button
-            onClick={clearChat}
-            className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors px-2 py-1 bg-cyan-500/10 rounded border border-cyan-500/20"
-          >
-            Clear
-          </button>
+          {/* Logo Container */}
+          <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]">
+             <Sparkles size={14} className="text-cyan-400" />
+          </div>
+          <div>
+             <h3 className="text-sm font-semibold text-gray-200 leading-none">AI Assistant</h3>
+             <span className="text-[10px] text-gray-500">Powered by Gemini</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+           {/* Usage Limit Badge */}
+           {!isPremium && (
+             <div className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border ${
+                aiLimitReached 
+                ? "bg-red-500/10 border-red-500/30 text-red-400"
+                : "bg-[#161b22] border-[#30363d] text-cyan-400/90"
+             }`}>
+                {usageLimits?.aiChatQueries?.remaining || 0} left
+             </div>
+           )}
+           
+           {/* Clear Button */}
+           <button 
+             onClick={() => setMessages([{ from: "system", text: "Chat cleared. How can I help?" }])}
+             className="text-gray-500 hover:text-red-400 transition-colors p-1 rounded-md hover:bg-[#161b22]" 
+             title="Clear Chat"
+           >
+             <Trash2 size={14} />
+           </button>
         </div>
       </div>
 
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-auto p-4 space-y-3">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.from === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-lg p-3 ${
-                m.from === "user"
-                  ? "bg-cyan-600 text-white"
-                  : "bg-slate-800 text-slate-100 border border-slate-700"
-              }`}
+      {/* --- 2. Chat Area --- */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar scroll-smooth bg-[#0d1117]">
+        {messages.map((msg, idx) => {
+          const isUser = msg.from === "user";
+          const isSystem = msg.from === "system";
+          
+          if (isSystem) {
+             return (
+               <div key={idx} className="flex justify-center my-6">
+                 <span className="text-[11px] text-gray-500 bg-[#161b22] border border-[#30363d] px-3 py-1 rounded-full shadow-sm">
+                    {msg.text.replace(/\*\*/g, '')}
+                 </span>
+               </div>
+             );
+          }
+
+          return (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              key={idx} 
+              className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
             >
-              <ReactMarkdown
-                components={{
-                  code({ node, inline, className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || "");
-                    const codeString = String(children).replace(/\n$/, "");
-                    const codeId = `code-${i}-${Date.now()}`;
+              {/* Avatar */}
+              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border shadow-sm ${
+                  isUser 
+                  ? "bg-blue-600/20 border-blue-500/30"
+                  : "bg-cyan-500/10 border-cyan-500/20"
+              }`}>
+                  {isUser ? (
+                    <div className="w-4 h-4 rounded-full bg-blue-500" />
+                  ) : (
+                    <Bot size={16} className="text-cyan-400" />
+                  )}
+              </div>
 
-                    return !inline && match ? (
-                      <div className="relative my-2">
-                        <button
-                          onClick={() => handleCopy(codeId, codeString)}
-                          className="absolute top-2 right-2 p-1.5 bg-slate-700 hover:bg-slate-600 rounded-md transition-colors z-10"
-                          title="Copy code"
-                        >
-                          {copyStates[codeId] ? (
-                            <Check size={14} className="text-green-400" />
-                          ) : (
-                            <Copy size={14} className="text-slate-300" />
-                          )}
-                        </button>
-                        <SyntaxHighlighter
-                          style={oneDark}
-                          language={match[1]}
-                          PreTag="div"
-                          className="rounded-md text-xs"
-                          {...props}
-                        >
-                          {codeString}
-                        </SyntaxHighlighter>
-                      </div>
-                    ) : (
-                      <code
-                        className="bg-slate-700 px-1.5 py-0.5 rounded text-xs"
-                        {...props}
-                      >
-                        {children}
-                      </code>
-                    );
-                  },
-                  p({ children }) {
-                    return <p className="mb-2 leading-relaxed text-sm">{children}</p>;
-                  },
-                  strong({ children }) {
-                    return <strong className="font-bold text-cyan-300">{children}</strong>;
-                  },
-                  ul({ children }) {
-                    return <ul className="list-disc list-inside mb-2 space-y-1 text-sm">{children}</ul>;
-                  },
-                  li({ children }) {
-                    return <li className="text-sm">{children}</li>;
-                  },
-                  h1({ children }) {
-                    return <h1 className="text-base font-bold text-cyan-300 mb-2">{children}</h1>;
-                  },
-                  h2({ children }) {
-                    return <h2 className="text-sm font-bold text-cyan-300 mb-2">{children}</h2>;
-                  },
-                  h3({ children }) {
-                    return <h3 className="text-sm font-semibold text-cyan-300 mb-1">{children}</h3>;
-                  },
-                }}
-              >
-                {m.text}
-              </ReactMarkdown>
-            </div>
-          </div>
-        ))}
-
+              {/* Message Bubble */}
+              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                 isUser 
+                 ? "bg-[#1f6feb] text-white rounded-tr-sm border border-transparent" 
+                 : "bg-[#161b22] border border-[#30363d] text-gray-300 rounded-tl-sm"
+              }`}>
+                 <ReactMarkdown
+                    components={{
+                       p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                       a: ({href, children}) => <a href={href} target="_blank" className="text-cyan-400 hover:underline">{children}</a>,
+                       strong: ({children}) => <span className="font-bold text-white">{children}</span>,
+                       ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                       code: ({node, inline, className, children, ...props}) => {
+                          const match = /language-(\w+)/.exec(className || '');
+                          const codeText = String(children).replace(/\n$/, '');
+                          const id = `code-${idx}-${Math.random()}`;
+                          
+                          if (!inline && match) {
+                            return (
+                              <div className="my-3 rounded-lg border border-[#30363d] overflow-hidden bg-[#0d1117]">
+                                <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#30363d]">
+                                   <span className="text-[10px] text-gray-400 font-mono uppercase font-semibold">{match[1]}</span>
+                                   <button 
+                                      onClick={() => handleCopy(id, codeText)} 
+                                      className="text-gray-500 hover:text-white transition-colors"
+                                      title="Copy"
+                                   >
+                                      {copyStates[id] ? <Check size={13} className="text-green-400"/> : <Copy size={13}/>}
+                                   </button>
+                                </div>
+                                <SyntaxHighlighter 
+                                  style={vscDarkPlus} 
+                                  language={match[1]} 
+                                  PreTag="div"
+                                  className="!bg-[#0d1117] !p-3 !m-0 !text-xs !font-mono"
+                                  {...props}
+                                >
+                                  {codeText}
+                                </SyntaxHighlighter>
+                              </div>
+                            );
+                          }
+                          return (
+                            <code className="bg-[rgba(175,184,193,0.15)] px-1.5 py-0.5 rounded text-[12px] font-mono text-cyan-200" {...props}>
+                              {children}
+                            </code>
+                          );
+                       }
+                    }}
+                 >
+                    {msg.text}
+                 </ReactMarkdown>
+              </div>
+            </motion.div>
+          );
+        })}
+        
+        {/* Loading Indicator */}
         {loading && (
-          <div className="flex justify-start">
-            <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-              <Loader className="animate-spin text-cyan-400" size={18} />
-            </div>
-          </div>
+           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+                 <Loader2 size={16} className="text-cyan-400 animate-spin" />
+              </div>
+              <div className="px-4 py-3 bg-[#161b22] border border-[#30363d] rounded-2xl rounded-tl-sm flex gap-1.5 items-center h-10 shadow-sm">
+                 <span className="w-1.5 h-1.5 bg-cyan-500/50 rounded-full animate-bounce" />
+                 <span className="w-1.5 h-1.5 bg-cyan-500/50 rounded-full animate-bounce delay-100" />
+                 <span className="w-1.5 h-1.5 bg-cyan-500/50 rounded-full animate-bounce delay-200" />
+              </div>
+           </motion.div>
         )}
 
+        {/* Error Message */}
         {error && (
-          <div className="flex justify-center">
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-center space-x-2 max-w-sm">
-              <AlertCircle className="text-red-400 flex-shrink-0" size={18} />
-              <span className="text-xs text-red-300">{error}</span>
-            </div>
-          </div>
+           <div className="flex justify-center">
+              <div className="flex items-center gap-2 px-3 py-2 bg-red-900/10 border border-red-500/20 rounded-lg text-red-400 text-xs shadow-sm">
+                 <AlertTriangle size={14} />
+                 <span>{error}</span>
+              </div>
+           </div>
         )}
-
+        
         <div ref={endRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-slate-700 p-3 bg-slate-900/50">
-        {aiLimitReached ? (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-center">
-            <Lock className="mx-auto mb-2 text-red-400" size={28} />
-            <p className="text-red-300 font-medium text-xs mb-1">AI Chat Limit Reached</p>
-            <p className="text-xs text-slate-400 mb-3">
-              You've used all {usageLimits?.aiChatQueries?.limit || 10} free AI queries
-            </p>
-            <button 
-              onClick={() => setShowPaywall(true)}
-              className="px-4 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold text-xs rounded-md hover:from-cyan-400 hover:to-blue-400 transition-all flex items-center justify-center gap-2 mx-auto shadow-lg shadow-cyan-500/20"
-            >
-              <Crown size={14} />
-              Upgrade
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Ask me anything about this problem..."
-                rows={2}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 resize-none text-xs"
-                disabled={loading}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={loading || !input.trim()}
-                className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2 transition-colors flex items-center justify-center flex-shrink-0"
-              >
-                <Send size={16} />
-              </button>
+      {/* --- 3. Input Area --- */}
+      <div className="p-4 bg-[#0d1117] border-t border-[#30363d]">
+         {aiLimitReached ? (
+            <div className="p-4 rounded-xl border border-red-500/20 bg-gradient-to-r from-red-500/5 to-transparent text-center">
+               <Lock className="w-6 h-6 text-red-400 mx-auto mb-2" />
+               <h4 className="text-gray-200 font-medium text-sm mb-1">Weekly Limit Reached</h4>
+               <p className="text-gray-500 text-xs mb-3">Upgrade to Premium for unlimited queries.</p>
+               <button 
+                  onClick={() => setShowPaywall(true)}
+                  className="px-5 py-2 bg-white text-black text-xs font-bold rounded-full hover:scale-105 transition-transform flex items-center justify-center gap-2 mx-auto"
+               >
+                  <Crown size={14} className="fill-black" /> Get Premium
+               </button>
             </div>
-            <p className="text-xs text-slate-500 mt-1.5 text-center">
-              Press Enter to send, Shift+Enter for new line
-            </p>
-          </>
-        )}
-      </div>
-
-      {/* Powered by badge */}
-      <div className="px-4 py-1.5 text-center border-t border-slate-700 bg-slate-950/50">
-        <span className="text-xs text-slate-600">Powered by Gemini</span>
+         ) : (
+            <div className="relative group">
+               <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Ask a question..."
+                  rows={1}
+                  disabled={loading}
+                  className="w-full bg-[#161b22] text-gray-200 text-sm border border-[#30363d] rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 resize-none transition-all placeholder:text-gray-600 disabled:opacity-50"
+               />
+               
+               <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || loading}
+                  className="absolute right-2 bottom-2 p-1.5 bg-cyan-600 text-white rounded-lg disabled:bg-[#21262d] disabled:text-gray-600 transition-colors hover:bg-cyan-500 shadow-lg shadow-cyan-500/20 disabled:shadow-none"
+               >
+                  {loading ? <StopCircle size={16} /> : <CornerDownLeft size={16} />}
+               </button>
+            </div>
+         )}
+         
+         {!aiLimitReached && (
+            <div className="mt-2 text-center">
+               <p className="text-[10px] text-gray-600">
+                  AI may produce inaccurate information.
+               </p>
+            </div>
+         )}
       </div>
 
       <PaywallModal 
@@ -299,6 +310,13 @@ const ChatAi = ({ problem }) => {
         feature="AI Chat Queries"
         usage={usageLimits?.aiChatQueries}
       />
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #484f58; }
+      `}</style>
     </div>
   );
 };

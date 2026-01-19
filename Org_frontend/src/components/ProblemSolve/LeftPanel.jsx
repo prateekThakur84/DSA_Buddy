@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FileText, BookOpen, Video, Send, Bot } from "lucide-react";
+import { FileText, BookOpen, Video, Send, Bot, Sparkles } from "lucide-react";
 import DescriptionTab from "../DescriptionTab";
 import EditorialTab from "./EditorialTab";
 import VideoSolutionTab from "./VideoSolutionTab";
@@ -25,40 +25,38 @@ const LeftPanel = ({ problem, submissions, activeTab, onTabChange }) => {
     { id: "editorial", label: "Editorial", icon: BookOpen },
     { id: "video", label: "Video Solution", icon: Video },
     { id: "submissions", label: "Submissions", icon: Send },
-    { id: "ai", label: "AI Chat", icon: Bot },
+    { id: "ai", label: "AI Assistant", icon: Sparkles },
   ];
 
   return (
-    <div className="h-full flex flex-col bg-gray-800 border-r border-gray-700">
+    <div className="h-full flex flex-col bg-[#0d1117] border-r border-[#30363d] relative">
+      
+      {/* Top Decoration Line */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent z-10"></div>
+
       {/* Tab Navigation */}
-      <div className="border-b border-gray-700">
-        <div className="flex overflow-x-auto scrollbar-hide">
+      <div className="flex-shrink-0 bg-[#0d1117] border-b border-[#30363d] select-none">
+        <div className="flex overflow-x-auto scrollbar-hide items-end">
           {tabs.map((tab) => {
             const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            
             return (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
                 className={`
-                  relative min-w-max px-4 py-3 flex items-center gap-2 text-xs font-medium 
-                  transition-all duration-200 whitespace-nowrap outline-none
+                  relative px-4 py-3 flex items-center gap-2 text-xs font-medium 
+                  transition-all duration-200 whitespace-nowrap outline-none border-t-2
                   ${
-                    activeTab === tab.id
-                      ? "text-blue-400 bg-gray-700/50"
-                      : "text-gray-400 hover:text-gray-200 hover:bg-gray-750"
+                    isActive
+                      ? "text-gray-200 bg-[#1e1e1e] border-t-cyan-500 border-r border-r-[#30363d] border-l border-l-[#30363d]"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-[#161b22] border-t-transparent border-r border-r-transparent border-l border-l-transparent"
                   }
                 `}
               >
-                <Icon size={16} />
-                <span className="hidden sm:inline">{tab.label}</span>
-                {activeTab === tab.id && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400"
-                    initial={false}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                )}
+                <Icon size={14} className={isActive ? (tab.id === 'ai' ? "text-purple-400" : "text-cyan-400") : ""} />
+                <span className={isActive ? "text-white" : ""}>{tab.label}</span>
               </button>
             );
           })}
@@ -66,51 +64,63 @@ const LeftPanel = ({ problem, submissions, activeTab, onTabChange }) => {
       </div>
 
       {/* Tab Content - The "Keep Alive" Implementation */}
-      <div className="flex-1 overflow-hidden relative">
-        <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 p-4">
+      <div className="flex-1 overflow-hidden relative bg-[#0d1117]">
+        <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#30363d] scrollbar-track-transparent p-4 custom-scrollbar">
           
-          {/* Key Concept: We map through ALL tabs. 
-             If a tab has been visited, we render it.
-             If it is NOT active, we hide it with CSS ('hidden').
-             This keeps the component alive in the background.
-          */}
-
           {/* DESCRIPTION */}
-          <div className={activeTab === "description" ? "block h-full" : "hidden"}>
+          <div className={activeTab === "description" ? "block h-full animate-in fade-in duration-300" : "hidden"}>
              <DescriptionTab problem={problem} />
           </div>
 
           {/* EDITORIAL */}
           {visitedTabs.has("editorial") && (
-            <div className={activeTab === "editorial" ? "block h-full" : "hidden"}>
+            <div className={activeTab === "editorial" ? "block h-full animate-in fade-in duration-300" : "hidden"}>
               <EditorialTab problem={problem} key={problem._id} /> 
             </div>
           )}
 
           {/* VIDEO SOLUTION */}
           {visitedTabs.has("video") && (
-            <div className={activeTab === "video" ? "block h-full" : "hidden"}>
-              {/* key={problem._id} ensures state resets when you switch to a NEW problem */}
+            <div className={activeTab === "video" ? "block h-full animate-in fade-in duration-300" : "hidden"}>
               <VideoSolutionTab problem={problem} key={problem._id} />
             </div>
           )}
 
           {/* SUBMISSIONS */}
           {visitedTabs.has("submissions") && (
-            <div className={activeTab === "submissions" ? "block h-full" : "hidden"}>
+            <div className={activeTab === "submissions" ? "block h-full animate-in fade-in duration-300" : "hidden"}>
               <SubmissionsTab submissions={submissions} />
             </div>
           )}
 
           {/* AI CHAT */}
           {visitedTabs.has("ai") && (
-            <div className={activeTab === "ai" ? "block h-full" : "hidden"}>
+            <div className={activeTab === "ai" ? "block h-full animate-in fade-in duration-300" : "hidden"}>
               <ChatAi problem={problem} key={problem._id} />
             </div>
           )}
           
         </div>
       </div>
+      
+      {/* Global Style for Custom Scrollbar within this component scope */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #0d1117; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: #30363d; 
+          border-radius: 4px; 
+          border: 2px solid #0d1117;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: #484f58; 
+        }
+      `}</style>
     </div>
   );
 };

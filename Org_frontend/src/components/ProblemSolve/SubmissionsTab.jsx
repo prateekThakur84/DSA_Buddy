@@ -10,7 +10,7 @@ import {
   Code,
   X,
   ChevronRight,
-  Crown
+  Terminal
 } from 'lucide-react';
 
 const SubmissionsTab = ({ submissions }) => {
@@ -20,10 +20,12 @@ const SubmissionsTab = ({ submissions }) => {
   // Return early if no submissions
   if (!submissions || submissions.length === 0) {
     return (
-      <div className="p-6 text-center text-gray-400">
-        <TestTube size={48} className="mx-auto mb-4 opacity-50" />
-        <p className="text-lg">No submissions yet</p>
-        <p className="text-sm mt-2">Submit your code to see results here</p>
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-8 text-center bg-[#0d1117]">
+        <div className="w-16 h-16 bg-[#161b22] rounded-full flex items-center justify-center border border-[#30363d] mb-4">
+           <TestTube size={24} className="opacity-50" />
+        </div>
+        <h3 className="text-sm font-medium text-gray-300">No submissions yet</h3>
+        <p className="text-xs mt-1 max-w-[200px]">Run your code against test cases to see your results here.</p>
       </div>
     );
   }
@@ -40,38 +42,44 @@ const SubmissionsTab = ({ submissions }) => {
         return { 
           icon: CheckCircle, 
           color: 'text-green-400', 
-          bg: 'bg-green-500/20', 
-          border: 'border-green-500/30' 
+          bg: 'bg-green-500/10', 
+          border: 'border-green-500/20',
+          label: 'Accepted'
         };
       case 'wrong':
       case 'wrong answer':
         return { 
           icon: XCircle, 
           color: 'text-red-400', 
-          bg: 'bg-red-500/20', 
-          border: 'border-red-500/30' 
+          bg: 'bg-red-500/10', 
+          border: 'border-red-500/20',
+          label: 'Wrong Answer'
         };
       case 'error':
       case 'compilation error':
         return { 
           icon: AlertTriangle, 
           color: 'text-yellow-400', 
-          bg: 'bg-yellow-500/20', 
-          border: 'border-yellow-500/30' 
+          bg: 'bg-yellow-500/10', 
+          border: 'border-yellow-500/20',
+          label: 'Error'
         };
       case 'timeout':
+      case 'time limit exceeded':
         return { 
           icon: Clock, 
           color: 'text-orange-400', 
-          bg: 'bg-orange-500/20', 
-          border: 'border-orange-500/30' 
+          bg: 'bg-orange-500/10', 
+          border: 'border-orange-500/20',
+          label: 'TLE'
         };
       default:
         return { 
-          icon: Clock, 
+          icon: Terminal, 
           color: 'text-gray-400', 
-          bg: 'bg-gray-500/20', 
-          border: 'border-gray-500/30' 
+          bg: 'bg-gray-500/10', 
+          border: 'border-gray-500/20',
+          label: 'Unknown'
         };
     }
   };
@@ -89,24 +97,14 @@ const SubmissionsTab = ({ submissions }) => {
     }
   };
 
-  // Handle case when all are pending
-  if (visibleSubmissions.length === 0) {
-    return (
-      <div className="p-6 text-center text-gray-400">
-        <Clock size={48} className="mx-auto mb-4 animate-spin text-cyan-400" />
-        <p className="text-lg">Processing submissions...</p>
-        <p className="text-sm mt-2">This may take a few moments</p>
-      </div>
-    );
-  }
-
   return (
-    <>
-      <div className="p-6 space-y-4 max-h-[80vh] overflow-auto">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-cyan-300">Your Submissions</h2>
-          <span className="text-sm text-gray-400">
-            {visibleSubmissions.length} submission{visibleSubmissions.length !== 1 ? 's' : ''}
+    <div className="h-full bg-[#0d1117] flex flex-col relative">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+        
+        <div className="flex items-center justify-between mb-4 px-1">
+          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider">History</h2>
+          <span className="text-[10px] bg-[#161b22] text-gray-400 px-2 py-0.5 rounded-full border border-[#30363d]">
+            {visibleSubmissions.length} Total
           </span>
         </div>
 
@@ -116,175 +114,168 @@ const SubmissionsTab = ({ submissions }) => {
           return (
             <motion.div
               key={sub._id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className={`cursor-pointer bg-gray-800/50 rounded-lg p-4 border ${cfg.border} hover:border-cyan-500/50 hover:bg-gray-800/70 transition-all`}
               onClick={() => {
                 setSelected(sub);
                 setShowError(false);
               }}
+              className={`
+                group cursor-pointer rounded-lg p-3 border transition-all duration-200
+                bg-[#161b22] border-[#30363d] hover:border-cyan-500/30 hover:bg-[#1c2128]
+              `}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-full ${cfg.bg}`}>
-                    <Icon size={16} className={cfg.color} />
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 p-1.5 rounded-md ${cfg.bg} ${cfg.color}`}>
+                    <Icon size={16} />
                   </div>
                   <div>
-                    <span className={`font-medium capitalize ${cfg.color}`}>
-                      {sub.status}
-                    </span>
-                    <div className="text-sm text-gray-400">
-                      {sub.language} • {fmt(sub.createdAt)}
+                    <div className={`text-sm font-semibold ${cfg.color}`}>
+                      {cfg.label}
                     </div>
-                    {sub.executionDetails && sub.status === 'accepted' && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        {sub.executionDetails.runtime}ms • {sub.executionDetails.memory}KB
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[11px] text-gray-500 font-mono bg-[#0d1117] px-1.5 rounded border border-[#30363d]">
+                            {sub.language}
+                        </span>
+                        <span className="text-[11px] text-gray-500">
+                            {fmt(sub.createdAt)}
+                        </span>
+                    </div>
                   </div>
                 </div>
-                <ChevronRight className="text-gray-400 group-hover:translate-x-1 transition-transform" />
+                
+                {/* Right side stats for Accepted */}
+                {sub.executionDetails && sub.status === 'accepted' && (
+                    <div className="text-right hidden sm:block">
+                        <div className="text-[11px] text-gray-400 flex items-center justify-end gap-1">
+                            <Clock size={12} /> {sub.executionDetails.runtime}ms
+                        </div>
+                        <div className="text-[11px] text-gray-500 mt-0.5">
+                            {sub.executionDetails.memory}KB
+                        </div>
+                    </div>
+                )}
+                
+                <div className="sm:hidden text-gray-600 group-hover:text-cyan-400 pt-2">
+                    <ChevronRight size={16} />
+                </div>
               </div>
             </motion.div>
           );
         })}
       </div>
 
-      {/* ======= MODAL SECTION ======= */}
+      {/* ======= DETAIL MODAL ======= */}
       <AnimatePresence>
         {selected && (
-          <motion.div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelected(null)}
-          >
+          <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+            {/* Backdrop */}
             <motion.div
-              className="bg-gray-900 rounded-lg overflow-hidden max-w-3xl w-full max-h-[90vh] border border-cyan-500/30 shadow-2xl"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setSelected(null)}
+            />
+
+            {/* Modal Window */}
+            <motion.div
+              className="relative w-full max-w-2xl bg-[#0d1117] rounded-xl border border-[#30363d] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="bg-gray-800/50 p-6 border-b border-gray-700 flex items-center justify-between">
-                <h3 className="text-2xl font-semibold text-white">Submission Details</h3>
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#30363d] bg-[#161b22]">
+                <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${getStatusConfig(selected.status).bg}`}>
+                        {React.createElement(getStatusConfig(selected.status).icon, { 
+                            size: 20, 
+                            className: getStatusConfig(selected.status).color 
+                        })}
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-200">Submission Details</h3>
+                        <p className="text-xs text-gray-500">{fmt(selected.createdAt)}</p>
+                    </div>
+                </div>
                 <button
                   onClick={() => setSelected(null)}
-                  className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg"
+                  className="p-2 text-gray-400 hover:text-white hover:bg-[#30363d] rounded-lg transition-colors"
                 >
                   <X size={20} />
                 </button>
               </div>
 
-              {/* Content */}
-              <div className="p-6 overflow-auto max-h-[calc(90vh-80px)]">
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto custom-scrollbar">
+                
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                    <span className="block text-xs text-gray-400 mb-1">Status</span>
-                    <span className={`font-medium capitalize ${getStatusConfig(selected.status).color}`}>
-                      {selected.status}
-                    </span>
-                  </div>
-                  
-                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                    <span className="block text-xs text-gray-400 mb-1">Language</span>
-                    <span className="font-medium text-white capitalize">{selected.language}</span>
-                  </div>
-                  
-                  <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 col-span-2 md:col-span-1">
-                    <span className="block text-xs text-gray-400 mb-1">Submitted</span>
-                    <span className="font-medium text-white text-sm">{fmt(selected.createdAt)}</span>
-                  </div>
-
-                  {selected.executionDetails && (
-                    <>
-                      <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                        <span className="block text-xs text-gray-400 mb-1">Runtime</span>
-                        <div className="flex items-center space-x-2">
-                          <Clock size={16} className="text-blue-400" />
-                          <span className="font-medium text-white">
-                            {selected.executionDetails.runtime}ms
-                          </span>
+                {selected.executionDetails && (
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                        <div className="bg-[#161b22] border border-[#30363d] p-4 rounded-lg flex flex-col items-center justify-center text-center">
+                            <Clock size={20} className="text-blue-400 mb-2" />
+                            <span className="text-lg font-bold text-white">{selected.executionDetails.runtime}ms</span>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider">Runtime</span>
                         </div>
-                      </div>
-                      
-                      <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                        <span className="block text-xs text-gray-400 mb-1">Memory</span>
-                        <div className="flex items-center space-x-2">
-                          <MemoryStick size={16} className="text-purple-400" />
-                          <span className="font-medium text-white">
-                            {selected.executionDetails.memory}KB
-                          </span>
+                        <div className="bg-[#161b22] border border-[#30363d] p-4 rounded-lg flex flex-col items-center justify-center text-center">
+                            <MemoryStick size={20} className="text-purple-400 mb-2" />
+                            <span className="text-lg font-bold text-white">{selected.executionDetails.memory}KB</span>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider">Memory</span>
                         </div>
-                      </div>
-                      
-                      <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                        <span className="block text-xs text-gray-400 mb-1">Test Cases</span>
-                        <div className="flex items-center space-x-2">
-                          <TestTube size={16} className="text-green-400" />
-                          <span className="font-medium text-white">
-                            {selected.executionDetails.testCasesPassed}/{selected.executionDetails.testCasesTotal}
-                          </span>
+                        <div className="bg-[#161b22] border border-[#30363d] p-4 rounded-lg flex flex-col items-center justify-center text-center">
+                            <TestTube size={20} className="text-green-400 mb-2" />
+                            <span className="text-lg font-bold text-white">
+                                {selected.executionDetails.testCasesPassed}/{selected.executionDetails.testCasesTotal}
+                            </span>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider">Test Cases</span>
                         </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                    </div>
+                )}
 
                 {/* Source Code */}
                 <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-lg font-medium text-white flex items-center">
-                      <Code size={18} className="mr-2 text-cyan-400" />
-                      Source Code
-                    </h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Source Code</span>
+                    <span className="text-xs text-gray-500 font-mono bg-[#161b22] px-2 py-0.5 rounded">{selected.language}</span>
                   </div>
-                  <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-                    <pre className="p-4 font-mono text-sm text-green-300 overflow-auto max-h-80">
+                  <div className="bg-[#010409] border border-[#30363d] rounded-lg overflow-hidden relative group/code">
+                    <pre className="p-4 text-xs font-mono text-gray-300 overflow-x-auto custom-scrollbar">
                       {selected.code}
                     </pre>
                   </div>
                 </div>
 
-                {/* Error Details */}
+                {/* Error Details Accordion */}
                 {selected.errorDetails?.errorMessage && (
-                  <div>
+                  <div className="border border-red-500/20 bg-red-500/5 rounded-lg overflow-hidden">
                     <button
-                      onClick={() => setShowError((v) => !v)}
-                      className="flex items-center text-yellow-300 hover:text-yellow-100 mb-3 transition-colors font-medium"
+                      onClick={() => setShowError(!showError)}
+                      className="w-full flex items-center justify-between p-4 text-left hover:bg-red-500/10 transition-colors"
                     >
-                      <AlertTriangle size={18} className="mr-2" />
-                      Error Details
-                      <motion.div
-                        animate={{ rotate: showError ? 90 : 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="ml-2"
-                      >
-                        <ChevronRight size={16} />
-                      </motion.div>
+                      <div className="flex items-center gap-2 text-red-400">
+                        <AlertTriangle size={18} />
+                        <span className="font-semibold text-sm">Compilation / Runtime Error</span>
+                      </div>
+                      <ChevronRight 
+                        size={16} 
+                        className={`text-red-400 transition-transform duration-200 ${showError ? 'rotate-90' : ''}`} 
+                      />
                     </button>
                     
                     <AnimatePresence>
                       {showError && (
                         <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
+                          initial={{ height: 0 }}
+                          animate={{ height: 'auto' }}
+                          exit={{ height: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                            {selected.errorDetails.errorType && (
-                              <div className="font-medium text-red-400 mb-2 uppercase text-sm">
-                                {selected.errorDetails.errorType.replace('_', ' ')} ERROR
-                              </div>
-                            )}
-                            <div className="text-gray-300 whitespace-pre-wrap font-mono text-sm">
-                              {selected.errorDetails.errorMessage}
-                            </div>
+                          <div className="p-4 pt-0 text-xs font-mono text-red-300 whitespace-pre-wrap border-t border-red-500/20">
+                            <div className="mt-4">{selected.errorDetails.errorMessage}</div>
                           </div>
                         </motion.div>
                       )}
@@ -293,10 +284,17 @@ const SubmissionsTab = ({ submissions }) => {
                 )}
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
-    </>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #484f58; }
+      `}</style>
+    </div>
   );
 };
 

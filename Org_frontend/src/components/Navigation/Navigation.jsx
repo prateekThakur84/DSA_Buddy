@@ -71,7 +71,7 @@ const Navigation = () => {
       </motion.header>
 
       {/* Spacer to prevent content overlap */}
-      <div className="h-16"></div>
+      <div className="h-16 bg-slate-950 selection:bg-cyan-500"></div>
     </>
   );
 };
