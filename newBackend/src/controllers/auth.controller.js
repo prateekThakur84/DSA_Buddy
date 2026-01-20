@@ -11,6 +11,50 @@ const generateSecureToken = () => {
   return crypto.randomBytes(32).toString('hex');
 };
 
+const getAllUsers = async (req, res) => {
+  try {
+    const { search, role, page = 1, limit = 10 } = req.query;
+    
+    // Build query
+    const query = {};
+    if (search) {
+      query.$or = [
+        { emailId: { $regex: search, $options: 'i' } },
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (role && role !== 'all') {
+      query.role = role;
+    }
+
+    // Pagination
+    const skip = (page - 1) * limit;
+
+    const users = await User.find(query)
+      .select('-password -emailVerificationToken -passwordResetToken')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await User.countDocuments(query);
+
+    res.json({
+      success: true,
+      users,
+      pagination: {
+        current: parseInt(page),
+        total: Math.ceil(total / limit),
+        totalRecords: total
+      }
+    });
+
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ success: false, message: "Failed to fetch users" });
+  }
+};
+
 // Create JWT token
 const createJWTToken = (user) => {
   return jwt.sign(
@@ -539,41 +583,47 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-// Update user profile (no changes - already uses middleware)
 const updateUserProfile = async (req, res) => {
   try {
-    const { firstName, lastName, age } = req.body;
+    // 1. Destructure all allowed fields
+    const { firstName, lastName, age, profilePicture } = req.body;
     const userId = req.result._id;
-    
+
+    // 2. Create a dynamic update object
     const updateData = {};
+    
+    // Only add fields if they are actually provided in the request
     if (firstName) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
     if (age !== undefined) updateData.age = age;
-    
+    if (profilePicture !== undefined) updateData.profilePicture = profilePicture;
+
+    // 3. Update the user
     const user = await User.findByIdAndUpdate(
       userId,
       updateData,
       { new: true, runValidators: true }
     ).select('-password -emailVerificationToken -passwordResetToken');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found"
       });
     }
-    
+
+    // 4. Send response
     res.json({
       success: true,
       message: "Profile updated successfully",
       user
     });
-    
+
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to update profile"
+      message: error.message || "Failed to update profile"
     });
   }
 };
@@ -679,6 +729,87 @@ const adminRegister = async (req, res) => {
   }
 };
 
+const updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body; // 'user', 'admin', 'premium'
+
+    if (!['user', 'admin', 'premium'].includes(role)) {
+      return res.status(400).json({ success: false, message: "Invalid role" });
+    }
+
+    // Prevent changing your own role to lock yourself out
+    if (userId === req.result._id.toString()) {
+      return res.status(400).json({ success: false, message: "Cannot change your own role" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId, 
+      { role }, 
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: `User role updated to ${role}`,
+      user
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to update role" });
+  }
+};
+
+const deleteUserByAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (userId === req.result._id.toString()) {
+      return res.status(400).json({ success: false, message: "Cannot delete yourself here" });
+    }
+
+    await User.findByIdAndDelete(userId);
+    // Also clean up submissions/solutions if needed
+    // await Submission.deleteMany({ userId }); 
+
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to delete user" });
+  }
+};
+
+const getUserDetailsByAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId)
+      .select('-password -emailVerificationToken -passwordResetToken')
+      .populate('problemSolved', 'title difficulty tags createdAt'); // Populate solved problems
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Calculate some quick stats on the fly
+    const stats = {
+      easy: user.problemSolved.filter(p => p.difficulty === 'easy').length,
+      medium: user.problemSolved.filter(p => p.difficulty === 'medium').length,
+      hard: user.problemSolved.filter(p => p.difficulty === 'hard').length,
+      totalSolved: user.problemSolved.length
+    };
+
+    res.json({
+      success: true,
+      user,
+      stats
+    });
+
+  } catch (error) {
+    console.error('Get user details error:', error);
+    res.status(500).json({ success: false, message: "Failed to fetch user details" });
+  }
+};
+
 module.exports = {
   register,
   verifyEmail,
@@ -693,5 +824,9 @@ module.exports = {
   updateUserProfile,
   changePassword,
   deleteProfile,
-  adminRegister
+  adminRegister,
+  getAllUsers,
+  updateUserRole,
+  deleteUserByAdmin,
+  getUserDetailsByAdmin
 };

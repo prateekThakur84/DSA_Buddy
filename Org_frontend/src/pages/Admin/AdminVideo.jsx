@@ -15,6 +15,8 @@ import {
   FileText,
   Clock,
   HardDrive,
+  Loader2,
+  Film
 } from "lucide-react";
 import { Link } from "react-router";
 import axiosClient from "../../utils/axiosClient";
@@ -22,7 +24,6 @@ import axiosClient from "../../utils/axiosClient";
 const AdminVideo = () => {
   const [problems, setProblems] = useState([]);
   const [filteredProblems, setFilteredProblems] = useState([]);
-  const [selectedProblem, setSelectedProblem] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(null);
@@ -35,6 +36,24 @@ const AdminVideo = () => {
   const [uploadingProblemId, setUploadingProblemId] = useState(null);
   const [videoMetadata, setVideoMetadata] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(null);
+
+  // --- ANIMATION VARIANTS ---
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { type: "spring", damping: 20, stiffness: 100 },
+    },
+  };
 
   useEffect(() => {
     fetchProblems();
@@ -52,10 +71,11 @@ const AdminVideo = () => {
     try {
       setLoading(true);
       const response = await axiosClient.get("/problem/getAllProblem");
-      // Fetch detailed problem info to check for videos
+      
       const problemsWithVideoStatus = await Promise.all(
         response.data.map(async (problem) => {
           try {
+            // Optimizing: Only fetch details if needed, or rely on backend to send video flag in getAllProblem to speed this up
             const detailResponse = await axiosClient.get(
               `/problem/problemById/${problem._id}`
             );
@@ -84,7 +104,6 @@ const AdminVideo = () => {
     }
   };
 
-  // Handle file selection and extract metadata
   const handleFileSelect = async (e, problemId) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -94,9 +113,11 @@ const AdminVideo = () => {
     setVideoMetadata(null);
     setUploadProgress(0);
 
-    // Extract video metadata
     const video = document.createElement("video");
+    video.preload = "metadata";
+    
     video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src);
       const sizeInMB = (file.size / 1024 / 1024).toFixed(2);
       const duration = Math.floor(video.duration);
       const minutes = Math.floor(duration / 60);
@@ -108,16 +129,11 @@ const AdminVideo = () => {
         duration: `${minutes}:${seconds.toString().padStart(2, "0")}`,
         type: file.type,
       });
-
-      // Cleanup
-      URL.revokeObjectURL(video.src);
     };
 
     video.onerror = () => {
-      setError("Failed to read video file. Please select a valid video.");
+      setError("Invalid video file.");
       setUploadingProblemId(null);
-      setUploadingFile(null);
-      URL.revokeObjectURL(video.src);
     };
 
     video.src = URL.createObjectURL(file);
@@ -132,18 +148,9 @@ const AdminVideo = () => {
       setSuccess("");
       setUploadProgress(0);
 
-      // Step 1: Get upload signature from backend
       const signatureResponse = await axiosClient.get(`/video/create/${problemId}`);
-      const {
-        signature,
-        timestamp,
-        public_id,
-        api_key,
-        cloud_name,
-        upload_url,
-      } = signatureResponse.data;
+      const { signature, timestamp, public_id, api_key, upload_url } = signatureResponse.data;
 
-      // Step 2: Upload to Cloudinary with progress tracking
       const formData = new FormData();
       formData.append("file", file);
       formData.append("signature", signature);
@@ -154,7 +161,6 @@ const AdminVideo = () => {
 
       const xhr = new XMLHttpRequest();
 
-      // Progress tracking
       xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable) {
           const percentCompleted = Math.round((e.loaded * 100) / e.total);
@@ -162,40 +168,19 @@ const AdminVideo = () => {
         }
       });
 
-      // Handle completion
-      const uploadPromise = new Promise((resolve, reject) => {
+      const uploadResult = await new Promise((resolve, reject) => {
         xhr.addEventListener("load", () => {
           if (xhr.status === 200) {
-            try {
-              const uploadResult = JSON.parse(xhr.responseText);
-              resolve(uploadResult);
-            } catch (err) {
-              reject(new Error("Failed to parse upload response"));
-            }
+            resolve(JSON.parse(xhr.responseText));
           } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            reject(new Error("Upload failed"));
           }
         });
-
-        xhr.addEventListener("error", () => {
-          reject(new Error("Network error during upload"));
-        });
-
-        xhr.addEventListener("abort", () => {
-          reject(new Error("Upload cancelled"));
-        });
+        xhr.addEventListener("error", () => reject(new Error("Network error")));
+        xhr.open("POST", upload_url, true);
+        xhr.send(formData);
       });
 
-      xhr.open("POST", upload_url, true);
-      xhr.send(formData);
-
-      const uploadResult = await uploadPromise;
-
-      if (uploadResult.error) {
-        throw new Error(uploadResult.error.message);
-      }
-
-      // Step 3: Save video metadata to backend
       await axiosClient.post("/video/save", {
         problemId,
         cloudinaryPublicId: uploadResult.public_id,
@@ -207,546 +192,325 @@ const AdminVideo = () => {
       setUploadingProblemId(null);
       setUploadingFile(null);
       setVideoMetadata(null);
-      setUploadProgress(0);
-
-      fetchProblems(); // Refresh the list
-
+      fetchProblems();
+      
       setTimeout(() => setSuccess(""), 3000);
     } catch (error) {
-      console.error("Error uploading video:", error);
-      setError(
-        error.response?.data?.error || error.message || "Failed to upload video"
-      );
+      console.error("Upload error:", error);
+      setError("Failed to upload video");
     } finally {
       setUploadLoading(false);
     }
   };
 
   const handleDeleteVideo = async (problemId, problemTitle) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the video for "${problemTitle}"?`
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm(`Delete video for "${problemTitle}"?`)) return;
 
     try {
       setDeleteLoading(problemId);
       await axiosClient.delete(`/video/delete/${problemId}`);
-
       setSuccess("Video deleted successfully");
-      fetchProblems(); // Refresh the list
-
+      fetchProblems();
       setTimeout(() => setSuccess(""), 3000);
     } catch (error) {
-      console.error("Error deleting video:", error);
-      setError(error.response?.data?.error || "Failed to delete video");
+      setError("Failed to delete video");
     } finally {
       setDeleteLoading(null);
     }
   };
 
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty?.toLowerCase()) {
-      case "easy":
-        return "text-green-400 bg-green-400/10 border-green-400/20";
-      case "medium":
-        return "text-yellow-400 bg-yellow-400/10 border-yellow-400/20";
-      case "hard":
-        return "text-red-400 bg-red-400/10 border-red-400/20";
-      default:
-        return "text-gray-400 bg-gray-400/10 border-gray-400/20";
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-cyan-400 font-medium">
-                Loading problems...
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+    <div className="min-h-screen bg-[#030712] text-slate-300 font-sans selection:bg-cyan-500/30 relative overflow-hidden">
+      
+      {/* --- BACKGROUND: CYBER GRID --- */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#030712] via-[#0B1120] to-[#000000]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[128px] animate-pulse" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[128px] animate-pulse" />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+        
+        {/* --- HEADER --- */}
+        <motion.div 
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+          className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl">
-                <Video className="w-6 h-6 text-white" />
+          <motion.div variants={itemVariants}>
+            <Link to="/admin" className="inline-flex items-center gap-2 text-slate-500 hover:text-cyan-400 mb-4 transition-colors group">
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span className="text-sm font-medium uppercase tracking-wide">Back to Dashboard</span>
+            </Link>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                <Film className="w-8 h-8 text-purple-400" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">
+                <h1 className="text-4xl font-bold text-white tracking-tight">
                   Video Solutions
                 </h1>
-                <p className="text-gray-300">
-                  Upload and manage video solutions for problems
-                </p>
+                <p className="text-slate-400 text-lg">Manage educational content and tutorials.</p>
               </div>
             </div>
-            <Link
-              to="/admin"
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back to Admin</span>
-            </Link>
-          </div>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+             {/* Search Bar */}
+             <div className="relative group w-full md:w-80">
+               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-cyan-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-500" />
+               <div className="relative flex items-center bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800 group-hover:border-purple-500/30 transition-colors">
+                 <Search className="absolute left-3 w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors" />
+                 <input 
+                    type="text" 
+                    placeholder="Search problems..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-transparent text-slate-200 pl-10 pr-4 py-3 rounded-xl focus:outline-none placeholder:text-slate-600 text-sm"
+                 />
+               </div>
+             </div>
+          </motion.div>
         </motion.div>
 
-        {/* Search */}
-        <motion.div
+        {/* --- ALERTS --- */}
+        <AnimatePresence>
+          {(success || error) && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className={`mb-8 p-4 rounded-xl border flex items-center gap-3 ${
+                success 
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                  : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+              }`}
+            >
+              {success ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+              <span className="font-medium">{success || error}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* --- MAIN CONTENT --- */}
+        <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-black/20 backdrop-blur-lg border border-cyan-400/20 rounded-xl p-6 mb-8"
+          transition={{ delay: 0.2 }}
+          className="bg-slate-900/40 backdrop-blur-xl border border-slate-800 rounded-3xl overflow-hidden shadow-2xl relative min-h-[400px]"
         >
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search problems by title..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-black/50 border border-cyan-400/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-200"
-            />
+          {/* Top Sheen */}
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent opacity-50" />
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/30 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                  <th className="p-6">Problem Title</th>
+                  <th className="p-6">Difficulty</th>
+                  <th className="p-6">Content Status</th>
+                  <th className="p-6 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {loading ? (
+                  <tr>
+                    <td colSpan="4" className="p-20 text-center">
+                       <div className="flex flex-col items-center justify-center gap-4 text-slate-500">
+                         <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+                         <span className="text-sm font-mono animate-pulse">Syncing Library...</span>
+                       </div>
+                    </td>
+                  </tr>
+                ) : filteredProblems.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="p-16 text-center text-slate-500">
+                      <div className="flex flex-col items-center gap-3">
+                        <Video className="w-10 h-10 text-slate-700" />
+                        <p>No problems found matching your criteria.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProblems.map((problem) => (
+                    <motion.tr 
+                      key={problem._id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="hover:bg-slate-800/40 transition-colors group"
+                    >
+                      <td className="p-6 font-medium text-slate-200 group-hover:text-white transition-colors">
+                        {problem.title}
+                      </td>
+                      <td className="p-6">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
+                          problem.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                          problem.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                          'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        }`}>
+                          {problem.difficulty}
+                        </span>
+                      </td>
+                      <td className="p-6">
+                        {problem.hasVideo ? (
+                          <div className="flex items-center gap-2 text-cyan-400 text-sm font-medium bg-cyan-500/10 px-3 py-1.5 rounded-full w-fit border border-cyan-500/20">
+                            <CheckCircle className="w-4 h-4" /> Available
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-500 text-sm font-medium bg-slate-500/10 px-3 py-1.5 rounded-full w-fit border border-slate-500/20">
+                            <div className="w-2 h-2 rounded-full bg-slate-500" /> Missing
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-6 text-right">
+                        <div className="flex justify-end gap-3">
+                          {problem.hasVideo ? (
+                            <>
+                              <a 
+                                href={problem.videoData?.secureUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-2 bg-slate-800 hover:bg-cyan-500/20 hover:text-cyan-400 text-slate-400 rounded-lg transition-all border border-slate-700 hover:border-cyan-500/30"
+                                title="Watch Video"
+                              >
+                                <Play className="w-4 h-4" />
+                              </a>
+                              <button 
+                                onClick={() => handleDeleteVideo(problem._id, problem.title)}
+                                disabled={deleteLoading === problem._id}
+                                className="p-2 bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-lg transition-all border border-slate-700 hover:border-rose-500/30 disabled:opacity-50"
+                                title="Delete Video"
+                              >
+                                {deleteLoading === problem._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                              </button>
+                            </>
+                          ) : (
+                            <div className="relative">
+                              <input
+                                type="file"
+                                accept="video/*"
+                                onChange={(e) => handleFileSelect(e, problem._id)}
+                                className="hidden"
+                                id={`video-upload-${problem._id}`}
+                                disabled={uploadLoading}
+                              />
+                              <label
+                                htmlFor={`video-upload-${problem._id}`}
+                                className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-bold rounded-lg shadow-lg shadow-purple-900/20 hover:shadow-purple-500/30 transition-all active:scale-95"
+                              >
+                                <Upload className="w-4 h-4" /> Upload
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </motion.div>
 
-        {/* Success/Error Messages */}
-        <AnimatePresence>
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -20 }}
-              className="mb-6 bg-green-500/10 border border-green-500/20 rounded-lg p-4"
-            >
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-green-400" />
-                <p className="text-green-400">{success}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -20 }}
-              className="mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4"
-            >
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
-                <p className="text-red-400">{error}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Upload Modal */}
+        {/* --- UPLOAD MODAL --- */}
         <AnimatePresence>
           {uploadingProblemId && videoMetadata && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              onClick={() => {
-                if (!uploadLoading) {
-                  setUploadingProblemId(null);
-                  setVideoMetadata(null);
-                  setUploadingFile(null);
-                  setUploadProgress(0);
-                }
-              }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4"
             >
               <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-gradient-to-br from-slate-900 via-gray-900 to-black border border-cyan-400/30 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="bg-[#0B1120] border border-purple-500/30 rounded-2xl w-full max-w-lg shadow-[0_0_50px_-12px_rgba(168,85,247,0.4)] relative overflow-hidden"
               >
-                {/* Close Button */}
-                <button
-                  onClick={() => {
-                    if (!uploadLoading) {
-                      setUploadingProblemId(null);
-                      setVideoMetadata(null);
-                      setUploadingFile(null);
-                      setUploadProgress(0);
-                    }
-                  }}
-                  disabled={uploadLoading}
-                  className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
-
-                {!uploadLoading ? (
-                  <>
-                    {/* Video Info Section */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="mb-8"
+                {/* Modal Header */}
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Cloud className="w-6 h-6 text-purple-400" />
+                    Upload Solution
+                  </h3>
+                  {!uploadLoading && (
+                    <button 
+                      onClick={() => { setUploadingProblemId(null); setVideoMetadata(null); }}
+                      className="text-slate-500 hover:text-white transition-colors"
                     >
-                      <h3 className="text-xl font-bold text-white mb-4 flex items-center space-x-2">
-                        <Video className="w-5 h-5 text-cyan-400" />
-                        <span>Video Information</span>
-                      </h3>
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
 
-                      <div className="space-y-3 mb-6">
-                        {/* File Name */}
-                        <motion.div
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.2 }}
-                          className="flex items-start space-x-3 bg-black/30 border border-cyan-400/20 rounded-lg p-3"
-                        >
-                          <FileText className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-1" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-gray-400 uppercase tracking-wide">
-                              File Name
-                            </p>
-                            <p className="text-sm text-white font-medium truncate">
-                              {videoMetadata.fileName}
-                            </p>
-                          </div>
-                        </motion.div>
-
-                        {/* File Size */}
-                        <motion.div
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.3 }}
-                          className="flex items-start space-x-3 bg-black/30 border border-cyan-400/20 rounded-lg p-3"
-                        >
-                          <HardDrive className="w-4 h-4 text-green-400 flex-shrink-0 mt-1" />
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-400 uppercase tracking-wide">
-                              File Size
-                            </p>
-                            <p className="text-sm text-white font-medium">
-                              {videoMetadata.fileSize} MB
-                            </p>
-                          </div>
-                        </motion.div>
-
-                        {/* Duration */}
-                        <motion.div
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.4 }}
-                          className="flex items-start space-x-3 bg-black/30 border border-cyan-400/20 rounded-lg p-3"
-                        >
-                          <Clock className="w-4 h-4 text-blue-400 flex-shrink-0 mt-1" />
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-400 uppercase tracking-wide">
-                              Duration
-                            </p>
-                            <p className="text-sm text-white font-medium">
-                              {videoMetadata.duration}
-                            </p>
-                          </div>
-                        </motion.div>
-
-                        {/* File Type */}
-                        <motion.div
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.5 }}
-                          className="flex items-start space-x-3 bg-black/30 border border-cyan-400/20 rounded-lg p-3"
-                        >
-                          <FileVideo className="w-4 h-4 text-purple-400 flex-shrink-0 mt-1" />
-                          <div className="flex-1">
-                            <p className="text-xs text-gray-400 uppercase tracking-wide">
-                              File Type
-                            </p>
-                            <p className="text-sm text-white font-medium">
-                              {videoMetadata.type || "video file"}
-                            </p>
-                          </div>
-                        </motion.div>
+                <div className="p-6 space-y-6">
+                  {/* File Info Card */}
+                  <div className="bg-slate-900/80 rounded-xl p-4 border border-slate-800 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
+                        <FileVideo className="w-5 h-5" />
                       </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-3 pt-4 border-t border-cyan-400/10">
-                        <button
-                          onClick={() => {
-                            setUploadingProblemId(null);
-                            setVideoMetadata(null);
-                            setUploadingFile(null);
-                            setUploadProgress(0);
-                          }}
-                          className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-medium"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleVideoUpload(uploadingProblemId, uploadingFile)
-                          }
-                          className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg transition-colors font-medium"
-                        >
-                          Confirm Upload
-                        </button>
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-medium text-slate-200 truncate">{videoMetadata.fileName}</p>
+                        <p className="text-xs text-slate-500">{videoMetadata.type}</p>
                       </div>
-                    </motion.div>
-                  </>
-                ) : (
-                  <>
-                    {/* Upload Progress Section */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-6"
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <div className="flex items-center gap-2 text-xs text-slate-400 bg-black/20 p-2 rounded-lg">
+                        <HardDrive className="w-3.5 h-3.5" /> {videoMetadata.fileSize} MB
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-400 bg-black/20 p-2 rounded-lg">
+                        <Clock className="w-3.5 h-3.5" /> {videoMetadata.duration}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar (Only when uploading) */}
+                  {uploadLoading && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold uppercase text-purple-400 tracking-wider">
+                        <span>Uploading...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${uploadProgress}%` }}
+                          className="h-full bg-gradient-to-r from-purple-500 to-cyan-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setUploadingProblemId(null); setVideoMetadata(null); }}
+                      disabled={uploadLoading}
+                      className="flex-1 py-3 px-4 rounded-xl border border-slate-700 text-slate-300 font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
                     >
-                      <div>
-                        <h3 className="text-lg font-bold text-white mb-2 flex items-center space-x-2">
-                          <Cloud className="w-5 h-5 text-cyan-400 animate-pulse" />
-                          <span>Uploading Video</span>
-                        </h3>
-                        <p className="text-sm text-gray-400">
-                          {videoMetadata.fileName}
-                        </p>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="space-y-3">
-                        <div className="relative h-3 bg-black/50 rounded-full overflow-hidden border border-cyan-400/20">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${uploadProgress}%` }}
-                            transition={{ duration: 0.3 }}
-                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 rounded-full"
-                          />
-                        </div>
-
-                        {/* Progress Percentage */}
-                        <div className="flex justify-between items-center">
-                          <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">
-                            {uploadProgress}%
-                          </span>
-                          <span className="text-xs text-gray-400 uppercase tracking-wide">
-                            {uploadProgress === 100 ? "Processing..." : "In Progress"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Upload Animation */}
-                      <motion.div
-                        animate={{ scale: [1, 1.1, 1] }}
-                        transition={{ repeat: Infinity, duration: 1.5 }}
-                        className="flex justify-center"
-                      >
-                        <div className="w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-full flex items-center justify-center border border-cyan-400/30">
-                          <Cloud className="w-8 h-8 text-cyan-400" />
-                        </div>
-                      </motion.div>
-
-                      {/* File Stats During Upload */}
-                      <div className="grid grid-cols-3 gap-2 pt-4 border-t border-cyan-400/10">
-                        <div className="text-center">
-                          <p className="text-xs text-gray-400">Size</p>
-                          <p className="text-sm font-semibold text-cyan-400">
-                            {videoMetadata.fileSize} MB
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xs text-gray-400">Duration</p>
-                          <p className="text-sm font-semibold text-blue-400">
-                            {videoMetadata.duration}
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xs text-gray-400">Status</p>
-                          <motion.p
-                            animate={{ opacity: [0.5, 1, 0.5] }}
-                            transition={{ repeat: Infinity, duration: 1.5 }}
-                            className="text-sm font-semibold text-green-400"
-                          >
-                            Active
-                          </motion.p>
-                        </div>
-                      </div>
-
-                      {/* Uploading Animation Indicator */}
-                      <motion.p
-                        animate={{ opacity: [0.5, 1, 0.5] }}
-                        transition={{ repeat: Infinity, duration: 2 }}
-                        className="text-center text-sm text-gray-400"
-                      >
-                        Please don't close this window...
-                      </motion.p>
-                    </motion.div>
-                  </>
-                )}
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleVideoUpload(uploadingProblemId, uploadingFile)}
+                      disabled={uploadLoading}
+                      className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold hover:shadow-lg hover:shadow-purple-500/20 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                    >
+                      {uploadLoading ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Processing</>
+                      ) : (
+                        "Confirm Upload"
+                      )}
+                    </button>
+                  </div>
+                </div>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Problems List */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-black/20 backdrop-blur-lg border border-cyan-400/20 rounded-xl overflow-hidden"
-        >
-          {filteredProblems.length === 0 ? (
-            <div className="text-center py-16">
-              <FileVideo className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-300 mb-2">
-                No problems found
-              </h3>
-              <p className="text-gray-400">
-                {searchTerm
-                  ? "Try adjusting your search criteria"
-                  : "No problems have been created yet"}
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-black/30">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Problem
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Difficulty
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Video Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700/30">
-                  {filteredProblems.map((problem, index) => (
-                    <motion.tr
-                      key={problem._id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="hover:bg-black/30 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="text-white font-medium">
-                          {problem.title}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getDifficultyColor(
-                            problem.difficulty
-                          )}`}
-                        >
-                          {problem.difficulty}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {problem.hasVideo ? (
-                          <div className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-green-400" />
-                            <span className="text-green-400 text-sm">
-                              Video Available
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <AlertTriangle className="w-4 h-4 text-yellow-400" />
-                            <span className="text-yellow-400 text-sm">
-                              No Video
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        {problem.hasVideo ? (
-                          <>
-                            <a
-                              href={problem.videoData?.secureUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-                            >
-                              <Play className="w-3 h-3 mr-1" />
-                              Watch
-                            </a>
-                            <button
-                              onClick={() =>
-                                handleDeleteVideo(problem._id, problem.title)
-                              }
-                              disabled={deleteLoading === problem._id}
-                              className="inline-flex items-center px-3 py-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-                            >
-                              {deleteLoading === problem._id ? (
-                                <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin mr-1"></div>
-                              ) : (
-                                <Trash2 className="w-3 h-3 mr-1" />
-                              )}
-                              {deleteLoading === problem._id
-                                ? "Deleting..."
-                                : "Delete"}
-                            </button>
-                          </>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="file"
-                              accept="video/*"
-                              onChange={(e) =>
-                                handleFileSelect(e, problem._id)
-                              }
-                              disabled={uploadLoading}
-                              className="hidden"
-                              id={`video-upload-${problem._id}`}
-                            />
-                            <label
-                              htmlFor={`video-upload-${problem._id}`}
-                              className={`inline-flex items-center px-3 py-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 ${
-                                uploadLoading
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : "cursor-pointer"
-                              } text-white text-sm rounded transition-colors`}
-                            >
-                              <Upload className="w-3 h-3 mr-1" />
-                              Upload Video
-                            </label>
-                          </div>
-                        )}
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </motion.div>
       </div>
     </div>
   );

@@ -7,6 +7,21 @@ import { ANIMATION_VARIANTS } from "./navigationConstants";
 import { getUserInitials } from "./navigationUtils";
 import { useClickOutside, useProfileDropdown } from "./navigationHooks";
 
+const handleImageError = (e) => {
+    e.target.onerror = null; // Prevent infinite loop if fallback also fails
+
+     e.target.src = "/default-avatar.png";
+    
+    // 1. Try to generate an avatar based on name initials
+    // if (currentUser?.firstName) {
+    //    e.target.src = `https://lh3.googleusercontent.com/gg-dl/ABS2GSl-CxXEpI6c1CPtKpRD3YH16fkRwsj2vAGetnJXLx0izxfoeSe4Y-K9F9HlJWhadIlwehzBTw7lRXOi0KO_0hbOQjXxvm9vQG1r_nYwtgz694boL5Q1UVc44UnBpBedyHy2tM53EHUkV0NixjYkJBKlc0-TU6KdP52GXmIXX8IvL-xx=s1024-rj`;
+    // } 
+    // else {
+    //    // 2. If no name, use generic ghost image
+    //    e.target.src = DEFAULT_AVATAR;
+    // }
+  };
+
 const AuthButtons = () => (
   <div className="flex items-center space-x-2">
     <Link to="/login">
@@ -42,6 +57,7 @@ const ProfileButton = ({ user, onClick, isOpen }) => (
       {user?.profilePicture ? (
         <img
           src={user.profilePicture}
+          onError={handleImageError}
           alt="Profile"
           className="w-8 h-8 rounded-full object-cover border-2 border-cyan-400/30"
         />

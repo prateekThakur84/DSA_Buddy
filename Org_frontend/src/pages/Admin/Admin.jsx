@@ -1,80 +1,112 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router'; // Ensure this matches your router version (react-router-dom usually)
+import { Link } from 'react-router'; 
+import { useDispatch, useSelector } from 'react-redux';
 import { 
   Plus, 
   Trash2, 
   Edit, 
   Video, 
-  BarChart3,
-  Users,
-  BookOpen,
-  Settings,
-  Shield
+  BarChart3, 
+  Users, 
+  BookOpen, 
+  Settings, 
+  Shield, 
+  Activity, 
+  Server,
+  Code2
 } from 'lucide-react';
 import axiosClient from '../../utils/axiosClient';
+import { fetchUsers } from '../../store/slices/adminSlice'; // Import from your slice
 
 const Admin = () => {
+  const dispatch = useDispatch();
+  
+  // Get User count from Redux
+  const { pagination: userPagination } = useSelector((state) => state.admin);
+  
   const [stats, setStats] = useState({
     totalProblems: 0,
-    totalUsers: 0,
-    totalSubmissions: 0,
-    recentActivity: []
+    totalUsers: 0, 
+    totalSubmissions: 0, // Placeholder until submission API is ready
   });
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAdminStats();
-  }, []);
-
-  const fetchAdminStats = async () => {
-    try {
+    const initDashboard = async () => {
       setLoading(true);
-      // Fetch problems count
-      const problemsResponse = await axiosClient.get('/problem/getAllProblem');
+      try {
+        // 1. Fetch Problems Count (Direct API)
+        const problemsResponse = await axiosClient.get('/problem/getAllProblem');
+        
+        // 2. Fetch Users Count (Via Redux Action)
+        // We fetch page 1 just to get the 'totalRecords' in metadata
+        await dispatch(fetchUsers({ page: 1 }));
+
+        setStats(prev => ({
+          ...prev,
+          totalProblems: problemsResponse.data.length,
+          // Note: totalUsers will be updated via useSelector below, 
+          // but we can set a local fallback here if needed.
+        }));
+      } catch (error) {
+        console.error('Error fetching admin stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initDashboard();
+  }, [dispatch]);
+
+  // Sync Redux state to local stats when it changes
+  useEffect(() => {
+    if (userPagination?.totalRecords) {
       setStats(prev => ({
         ...prev,
-        totalProblems: problemsResponse.data.length
+        totalUsers: userPagination.totalRecords
       }));
-    } catch (error) {
-      console.error('Error fetching admin stats:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [userPagination]);
 
   const adminActions = [
     {
       title: 'Create Problem',
-      description: 'Add new coding problems with test cases',
+      description: 'Add new coding challenges.',
       icon: Plus,
       path: '/admin/create',
-      color: 'from-green-400 to-green-600',
-      bgColor: 'bg-green-400/10 border-green-400/20'
+      color: 'bg-emerald-500',
+      textColor: 'text-emerald-400',
+      border: 'hover:border-emerald-500/50'
+    },
+   
+    {
+      title: 'Delete Problems',
+      description: 'Delete content.',
+      icon: Edit,
+      path: '/admin/delete', // Consider changing to /admin/problems if you have a list view
+      color: 'bg-blue-500',
+      textColor: 'text-blue-400',
+      border: 'hover:border-blue-500/50'
     },
     {
-      title: 'Manage Problems',
-      description: 'Edit or delete existing problems',
-      icon: Edit,
-      path: '/admin/delete',
-      color: 'from-blue-400 to-blue-600',
-      bgColor: 'bg-blue-400/10 border-blue-400/20'
+      title: 'User Management',
+      description: 'Control access & roles.',
+      icon: Users,
+      path: '/admin/userManage', // Updated path
+      color: 'bg-cyan-500',
+      textColor: 'text-cyan-400',
+      border: 'hover:border-cyan-500/50'
     },
     {
       title: 'Video Solutions',
-      description: 'Upload and manage video solutions',
+      description: 'Upload tutorials.',
       icon: Video,
       path: '/admin/videos',
-      color: 'from-purple-400 to-purple-600',
-      bgColor: 'bg-purple-400/10 border-purple-400/20'
-    },
-    {
-      title: 'Analytics',
-      description: 'View platform statistics and insights',
-      icon: BarChart3,
-      path: '/admin/analytics',
-      color: 'from-cyan-400 to-cyan-600',
-      bgColor: 'bg-cyan-400/10 border-cyan-400/20'
+      color: 'bg-purple-500',
+      textColor: 'text-purple-400',
+      border: 'hover:border-purple-500/50'
     }
   ];
 
@@ -82,90 +114,94 @@ const Admin = () => {
     {
       title: 'Total Problems',
       value: stats.totalProblems,
-      icon: BookOpen,
-      color: 'text-cyan-400',
-      bgColor: 'bg-cyan-400/10 border-cyan-400/20'
+      icon: Code2,
+      color: 'text-blue-400',
+      bg: 'bg-blue-500/10',
+      border: 'border-blue-500/20'
     },
     {
       title: 'Total Users',
       value: stats.totalUsers,
       icon: Users,
-      color: 'text-green-400',
-      bgColor: 'bg-green-400/10 border-green-400/20'
+      color: 'text-cyan-400',
+      bg: 'bg-cyan-500/10',
+      border: 'border-cyan-500/20'
     },
     {
-      title: 'Total Submissions',
-      value: stats.totalSubmissions,
-      icon: BarChart3,
-      color: 'text-purple-400',
-      bgColor: 'bg-purple-400/10 border-purple-400/20'
+      title: 'System Health',
+      value: "98%", // Static for now
+      icon: Activity,
+      color: 'text-emerald-400',
+      bg: 'bg-emerald-500/10',
+      border: 'border-emerald-500/20'
     }
   ];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-cyan-400 font-medium">Loading admin dashboard...</span>
-            </div>
-          </div>
+      <div className="min-h-screen bg-[#030712] flex items-center justify-center text-slate-400">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-mono tracking-widest uppercase animate-pulse">Initializing Dashboard...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-black">
-      {/* Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-32 w-80 h-80 bg-cyan-400 rounded-full mix-blend-multiply filter blur-xl opacity-5 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-32 w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-5 animate-blob animation-delay-2000"></div>
+    <div className="min-h-screen bg-[#030712] text-slate-300 font-sans selection:bg-cyan-500/30 relative overflow-hidden">
+      
+      {/* --- BACKGROUND: CYBER GRID --- */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#030712] via-[#0B1120] to-[#000000]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[128px] animate-pulse" />
       </div>
 
-      <div className="container mx-auto px-4 py-8 relative z-10">
+      <div className="container mx-auto px-6 pt-28 pb-12 relative z-10 max-w-7xl">
+        
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-12 flex flex-col md:flex-row md:items-center gap-6"
         >
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl shadow-lg shadow-cyan-900/20">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-              <p className="text-gray-400">Manage your DSA platform</p>
-            </div>
+          <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl shadow-lg shadow-cyan-500/20 border border-white/10">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold text-white tracking-tight mb-1">Admin Console</h1>
+            <p className="text-slate-400 text-lg">Overview of platform resources and user metrics.</p>
           </div>
         </motion.div>
 
-        {/* Stats Cards - Grid ensures equal height */}
+        {/* Stats Cards */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
         >
           {statsCards.map((stat, index) => {
             const Icon = stat.icon;
             return (
               <div
                 key={index}
-                className={`bg-black/20 backdrop-blur-lg border rounded-xl p-6 ${stat.bgColor} h-full flex flex-col justify-center`}
+                className={`bg-slate-900/40 backdrop-blur-xl border ${stat.border} rounded-3xl p-6 flex flex-col justify-center relative overflow-hidden group`}
               >
-                <div className="flex items-center justify-between">
+                {/* Background Glow */}
+                <div className={`absolute -right-6 -top-6 p-16 opacity-10 rounded-full blur-3xl ${stat.bg.replace('/10', '/30')}`} />
+                
+                <div className="flex items-center justify-between relative z-10">
                   <div>
-                    <p className="text-gray-400 text-sm font-medium mb-1">{stat.title}</p>
-                    <p className={`text-3xl font-bold ${stat.color}`}>
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">{stat.title}</p>
+                    <p className={`text-4xl font-bold ${stat.color} tracking-tight font-mono`}>
                       {stat.value.toLocaleString()}
                     </p>
                   </div>
-                  <div className={`p-3 rounded-lg bg-white/5 ${stat.color}`}>
-                     <Icon className="w-8 h-8" />
+                  <div className={`p-4 rounded-2xl ${stat.bg}`}>
+                    <Icon className={`w-8 h-8 ${stat.color}`} />
                   </div>
                 </div>
               </div>
@@ -173,32 +209,35 @@ const Admin = () => {
           })}
         </motion.div>
 
-        {/* Admin Actions - Grid ensures uniform boxes */}
+        {/* Quick Actions Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="mb-8"
+          className="mb-12"
         >
-          <h2 className="text-xl font-semibold text-white mb-6 pl-1">Quick Actions</h2>
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <Settings className="w-5 h-5 text-cyan-400" />
+            Quick Actions
+          </h2>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {adminActions.map((action, index) => {
               const Icon = action.icon;
               return (
-                <Link key={index} to={action.path} className="block h-full">
+                <Link key={index} to={action.path} className="block h-full group">
                   <motion.div
-                    className={`bg-black/20 backdrop-blur-lg border rounded-xl p-6 hover:bg-black/30 transition-all duration-300 group cursor-pointer ${action.bgColor} h-full flex flex-col`}
-                    whileHover={{ scale: 1.02, y: -5 }}
+                    className={`bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-2xl p-6 h-full transition-all duration-300 ${action.border} hover:bg-slate-800/60 hover:shadow-2xl hover:shadow-black/50`}
+                    whileHover={{ y: -5 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <div className={`w-12 h-12 bg-gradient-to-br ${action.color} rounded-lg flex items-center justify-center mb-4 group-hover:shadow-lg transition-all duration-300 shadow-lg shadow-black/50`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${action.color} shadow-lg shadow-black/20 group-hover:scale-110 transition-transform`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-cyan-100 transition-colors">
+                    <h3 className={`text-lg font-bold text-white mb-2 group-hover:${action.textColor} transition-colors`}>
                       {action.title}
                     </h3>
-                    <p className="text-gray-400 text-sm group-hover:text-gray-300 transition-colors flex-grow leading-relaxed">
+                    <p className="text-slate-400 text-sm leading-relaxed">
                       {action.description}
                     </p>
                   </motion.div>
@@ -208,43 +247,51 @@ const Admin = () => {
           </div>
         </motion.div>
 
-        {/* Platform Overview */}
+        {/* System Status */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="bg-black/20 backdrop-blur-lg border border-cyan-400/20 rounded-xl p-6"
+          className="bg-slate-900/30 backdrop-blur-md border border-slate-800 rounded-2xl p-6"
         >
-          <h2 className="text-xl font-semibold text-white mb-6 flex items-center">
-            <Settings className="w-5 h-5 mr-2 text-cyan-400" />
-            Platform Overview
+          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <Server className="w-5 h-5 text-emerald-400" />
+            System Status
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Status Item 1 */}
+            <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-slate-800">
               <div className="flex items-center space-x-3">
-                <div className="w-2.5 h-2.5 bg-green-400 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.5)]"></div>
-                <span className="text-gray-300 font-medium">System Status</span>
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-slate-300 font-medium text-sm">API Gateway</span>
               </div>
-              <span className="text-green-400 font-bold text-sm tracking-wide">OPERATIONAL</span>
+              <span className="text-emerald-400 font-bold text-xs tracking-wider bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">ONLINE</span>
             </div>
             
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+            {/* Status Item 2 */}
+            <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-slate-800">
               <div className="flex items-center space-x-3">
-                <div className="w-2.5 h-2.5 bg-cyan-400 rounded-full shadow-[0_0_8px_rgba(34,211,238,0.5)]"></div>
-                <span className="text-gray-300 font-medium">Database</span>
+                <div className="w-2.5 h-2.5 bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.5)]"></div>
+                <span className="text-slate-300 font-medium text-sm">MongoDB</span>
               </div>
-              <span className="text-cyan-400 font-bold text-sm tracking-wide">CONNECTED</span>
+              <span className="text-cyan-400 font-bold text-xs tracking-wider bg-cyan-500/10 px-2 py-1 rounded border border-cyan-500/20">CONNECTED</span>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+            {/* Status Item 3 */}
+            <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-slate-800">
               <div className="flex items-center space-x-3">
-                <div className="w-2.5 h-2.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(96,165,250,0.5)]"></div>
-                <span className="text-gray-300 font-medium">Code Execution</span>
+                <div className="w-2.5 h-2.5 bg-blue-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                <span className="text-slate-300 font-medium text-sm">Judge0 Engine</span>
               </div>
-              <span className="text-blue-400 font-bold text-sm tracking-wide">ACTIVE</span>
+              <span className="text-blue-400 font-bold text-xs tracking-wider bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">READY</span>
             </div>
           </div>
         </motion.div>
+
       </div>
     </div>
   );

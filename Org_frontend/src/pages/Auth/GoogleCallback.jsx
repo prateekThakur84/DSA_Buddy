@@ -17,7 +17,7 @@ export default function GoogleCallback() {
       
       // Verify authentication
       dispatch(checkAuth()).then(() => {
-        navigate('/dashboard');
+        navigate('/');
       });
     } else {
       // No token, redirect to login with error

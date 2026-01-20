@@ -12,8 +12,8 @@ import {
 export const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: Home, path: '/' },
   { id: 'problems', label: 'Problems', icon: Code, path: '/problems' },
-  { id: 'pricing', label: 'Pricing', icon: MessageCircle, path: '/price' },
   { id: 'about', label: 'About', icon: Info, path: '/about' },
+  { id: 'pricing', label: 'Pricing', icon: MessageCircle, path: '/price' },
 ];
 
 export const ADMIN_NAV_ITEMS = [

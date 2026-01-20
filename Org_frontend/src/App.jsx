@@ -39,6 +39,12 @@ import DeleteProblem from "./pages/Admin/AdminDelete";
 import ManageVideos from "./pages/Admin/AdminVideo";
 import UploadSolution from "./pages/Admin/AdminVideo";
 import PricingPage from "./pages/Pricing/PricingPage";
+import UserProfileEdit from "./pages/Profile/UserProfileEdit";
+import HomePage from "./pages/Dashboard/Homepage";
+import UserManagement from "./pages/Admin/UserManagement";
+import UserDetail from "./pages/Admin/UserDetail";
+import EditProblem from "./pages/Admin/EditProblem";
+// import AdminAnalytics from "./pages/Admin/AdminAnalytics";
 
 function App() {
   const dispatch = useDispatch();
@@ -57,7 +63,8 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<EmailVerification />} />
-        <Route path="/auth/google-callback" element={<GoogleCallback />} /> {/* ✅ ADDED */}
+        <Route path="/auth/google-callback" element={<GoogleCallback />} />{" "}
+        {/* ✅ ADDED */}
       </Route>
 
       {/* Main Application Routes */}
@@ -65,7 +72,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<About />} />
         <Route path="/price" element={<PricingPage />} />
-        
+
         <Route
           path="/dashboard"
           element={
@@ -74,7 +81,7 @@ function App() {
             </PrivateRoute>
           }
         />
-        
+
         <Route
           path="/problems"
           element={
@@ -83,7 +90,7 @@ function App() {
             </PrivateRoute>
           }
         />
-        
+
         <Route
           path="/problem/:id"
           element={
@@ -92,7 +99,7 @@ function App() {
             </PrivateRoute>
           }
         />
-        
+
         <Route
           path="/contests"
           element={
@@ -101,7 +108,7 @@ function App() {
             </PrivateRoute>
           }
         />
-        
+
         <Route
           path="/discuss"
           element={
@@ -110,13 +117,21 @@ function App() {
             </PrivateRoute>
           }
         />
-        
-        
+
         <Route
           path="/profile"
           element={
             <PrivateRoute>
               <UserProfile />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/profile/edit"
+          element={
+            <PrivateRoute>
+              <UserProfileEdit />
             </PrivateRoute>
           }
         />
@@ -132,7 +147,7 @@ function App() {
             </AdminRoute>
           }
         />
-        
+
         <Route
           path="/admin/create"
           element={
@@ -141,7 +156,7 @@ function App() {
             </AdminRoute>
           }
         />
-        
+
         <Route
           path="/admin/delete"
           element={
@@ -150,7 +165,15 @@ function App() {
             </AdminRoute>
           }
         />
-        
+        <Route
+          path="/admin/edit"
+          element={
+            <AdminRoute>
+              <EditProblem />
+            </AdminRoute>
+          }
+        />
+
         <Route
           path="/admin/videos"
           element={
@@ -159,7 +182,7 @@ function App() {
             </AdminRoute>
           }
         />
-        
+
         <Route
           path="/admin/upload"
           element={
@@ -168,7 +191,26 @@ function App() {
             </AdminRoute>
           }
         />
+        <Route
+          path="/admin/analytics"
+          element={<AdminRoute>{/* <AdminAnalytics /> */}</AdminRoute>}
+        />
+
+        <Route
+          path="/admin/userManage"
+          element={
+            <AdminRoute>
+              <UserManagement />
+            </AdminRoute>
+          }
+        />
       </Route>
+
+      <Route path="/admin/users/:id" element={
+  <AdminRoute>
+    <UserDetail />
+  </AdminRoute>
+} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

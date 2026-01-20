@@ -1,29 +1,66 @@
 import React, { useState } from 'react';
-import { Crown, Check, Zap, Sparkles, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { 
+  Crown, Check, ArrowRight, HelpCircle, 
+  Terminal, Sparkles, Plus, 
+  Navigation
+} from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useSelector } from 'react-redux';
 import SubscriptionModal from '../../components/Payment/SubscriptionModal';
 
-/**
- * Pricing Page Component - Ice Theme Version (Compact)
- * Full-featured pricing comparison page with ice blue color scheme
- * Displays Free vs Premium plans with FAQ section
- * 
- * Route: /pricing
- */
 const PricingPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useSelector((state) => state.auth);
   const [showModal, setShowModal] = useState(false);
   const [expandedFAQ, setExpandedFAQ] = useState(null);
 
-  const handleGetStarted = () => {
+  const handleGetStarted = (planType) => {
     if (!isAuthenticated) {
-      navigate('/auth/login');
-    } else {
+      navigate('/login');
+    } else if (planType === 'Premium') {
       setShowModal(true);
+    } else {
+      navigate('/problems');
     }
   };
+
+  // --- Configuration ---
+  const plans = [
+    {
+      id: 'free',
+      name: 'Free',
+      price: '₹0',
+      period: '/forever',
+      description: 'Essential tools for getting started.',
+      buttonText: 'Start Coding',
+      buttonVariant: 'outline',
+      icon: Terminal,
+      features: [
+        "Access to all problems",
+        "25 code executions", // Removed /mo
+        "10 AI chat queries", // Removed /mo
+        "Community support",
+      ]
+    },
+    {
+      id: 'premium',
+      name: 'Premium',
+      price: '₹199',
+      period: '/month',
+      description: 'Full power for serious interview prep.',
+      buttonText: 'Upgrade Now',
+      buttonVariant: 'gradient',
+      highlight: true,
+      icon: Crown,
+      features: [
+        "Unlimited executions",
+        "Unlimited AI assistance",
+        "Video solutions",
+        "Priority support",
+      ]
+    }
+  ];
 
   const faqItems = [
     {
@@ -33,249 +70,177 @@ const PricingPage = () => {
     },
     {
       id: 2,
-      question: "What payment methods do you accept?",
-      answer: "We accept all major credit/debit cards, UPI, net banking, and wallets through Razorpay's secure payment gateway."
+      question: "Do usage limits reset?",
+      answer: "Free tier limits reset monthly. Premium users enjoy unlimited access to all features instantly."
     },
     {
       id: 3,
-      question: "Do usage limits reset?",
-      answer: "No, free tier limits are lifetime limits per account. Upgrade to Premium for unlimited access to all features."
+      question: "Is there a student discount?",
+      answer: "We are working on special pricing for students! Contact support with your student ID for early access."
     },
     {
       id: 4,
-      question: "Can I upgrade from monthly to yearly?",
-      answer: "Yes! Contact support and we'll help you switch to the yearly plan and pro-rate your remaining monthly subscription."
+      question: "Can I get a refund?",
+      answer: "We offer a 7-day money-back guarantee if you are not satisfied with the Premium features. No questions asked."
     },
     {
       id: 5,
-      question: "What happens after my trial or limit runs out?",
-      answer: "You can continue using the platform with read-only access to problems, but won't be able to execute code, use AI chat, or access video solutions until you upgrade."
+      question: "Do you offer team plans?",
+      answer: "Yes, for campus or corporate training, please reach out to our sales team for custom bulk pricing."
     },
     {
       id: 6,
-      question: "Is there a student discount?",
-      answer: "We're working on special pricing for students! Contact us at support@dsabuddy.com with your student ID for early access to student plans."
+      question: "What currency is the billing in?",
+      answer: "All billing is currently processed in INR (Indian Rupee) via Razorpay, supporting UPI, Cards, and Netbanking."
     }
   ];
 
-  const freeFeatures = [
-    "Access to all problems",
-    "25 code executions",
-    "10 AI chat queries",
-    "5 video solutions",
-    "5 editorial accesses",
-    "Basic analytics"
-  ];
-
-  const premiumFeatures = [
-    "Unlimited code executions",
-    "Unlimited AI chat queries",
-    "Unlimited video solutions",
-    "Unlimited editorial content",
-    "Advanced analytics",
-    "Priority support"
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 py-8 px-4 relative overflow-hidden">
-      {/* Animated background blobs */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animation-delay-2000 animate-pulse"></div>
-
-      {/* Header */}
-      <div className="max-w-6xl mx-auto text-center mb-8 relative z-10">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-400/30 mb-4">
-          <Sparkles size={14} className="text-cyan-400" />
-          <span className="text-xs font-semibold text-cyan-300">Flexible Pricing Plans</span>
-        </div>
-        
-        <h1 className="text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-cyan-400 via-cyan-300 to-blue-400 bg-clip-text text-transparent">
-          Simple, Transparent Pricing
-        </h1>
-        <p className="text-base md:text-lg text-slate-300 max-w-2xl mx-auto">
-          Choose the plan that's right for you
-        </p>
-      </div>
-
-      {/* Plans Section - Single Row Layout */}
-      <div className="max-w-5xl mx-auto mb-10 relative z-10">
-  <div className="grid md:grid-cols-2 gap-4">
-    
-    {/* Free Tier Card */}
-    <div className="glass-ice rounded-lg p-4 border border-cyan-400/20 hover:border-cyan-400/40 transition-all duration-300 flex flex-col h-full">
-      <div className="mb-2">
-        <h3 className="text-lg font-bold text-white mb-0.5">Free</h3>
-        <p className="text-slate-300 text-[11px]">Perfect for getting started</p>
-      </div>
+    <div className="min-h-screen bg-[#030712] text-slate-300 font-sans selection:bg-cyan-500/30 relative overflow-x-hidden">
       
-      <div className="mb-3">
-        <div className="text-2xl font-bold text-cyan-400">₹0</div>
-        <p className="text-[11px] text-slate-400 mt-0.5">/forever</p>
+      <Navigation />
+      {/* --- BACKGROUND: CYBER GRID --- */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#030712] via-[#0B1120] to-[#000000]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[128px] animate-pulse" />
       </div>
-      
-      <button 
-        onClick={() => navigate('/auth/signup')}
-        className="w-full py-1.5 px-2.5 rounded-md border border-cyan-400/50 text-cyan-300 font-semibold hover:bg-cyan-400/10 transition-all duration-300 mb-3 text-xs flex items-center justify-center gap-1.5"
-      >
-        Get Started
-        <ArrowRight size={12} />
-      </button>
 
-      <div className="space-y-1.5 flex-grow">
-        {freeFeatures.map((feature, index) => (
-          <div key={index} className="flex items-start gap-1.5">
-            <Check className="text-cyan-400 flex-shrink-0 mt-0.5" size={12} />
-            <span className="text-slate-200 text-[11px]">{feature}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    {/* Premium Tier Card - Featured */}
-    <div className="group relative">
-      {/* Glow effect */}
-      <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 via-cyan-400 to-blue-400 rounded-lg blur-md opacity-30 group-hover:opacity-50 transition-all duration-300"></div>
-      
-      <div className="relative glass-ice-strong rounded-lg p-4 border border-cyan-400/40 flex flex-col h-full">
-        {/* Premium Badge */}
-        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/40 w-fit mb-2">
-          <Crown size={10} className="text-cyan-300" />
-          <span className="text-[10px] font-bold text-cyan-300">RECOMMENDED</span>
-        </div>
+      <div className="container mx-auto px-4 pt-24 pb-12 relative z-10 max-w-7xl">
         
-        <div className="mb-2">
-          <h3 className="text-lg font-bold text-white mb-0.5">Premium</h3>
-          <p className="text-cyan-200 text-[11px]">For serious learners</p>
-        </div>
-        
-        <div className="mb-3">
-          <div className="text-2xl font-bold text-transparent bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text">
-            ₹199
-          </div>
-          <p className="text-[11px] text-cyan-200 mt-0.5">/month or ₹1,999/year</p>
-          <p className="text-[11px] text-cyan-400 font-semibold mt-0.5">Save 16% on yearly</p>
-        </div>
-        
-        <button 
-          onClick={handleGetStarted}
-          className="w-full py-1.5 px-2.5 rounded-md bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 transition-all duration-300 mb-3 text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20"
+        {/* --- Heading Section --- */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center max-w-2xl mx-auto mb-12"
         >
-          <Crown size={12} />
-          Upgrade
-        </button>
+           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/30 border border-cyan-500/20 text-cyan-400 text-xs font-mono mb-4">
+              <Sparkles size={12} />
+              <span>Flexible Plans</span>
+           </div>
+           <h2 className="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight">
+            Transparent Pricing
+          </h2>
+          <p className="text-slate-400 text-sm">
+            Start for free, upgrade to accelerate your journey.
+          </p>
+        </motion.div>
 
-        <div className="space-y-1.5 flex-grow">
-          <div className="flex items-start gap-1.5 pb-1 border-b border-cyan-400/20">
-            <Zap className="text-cyan-300 flex-shrink-0 mt-0.5" size={12} />
-            <span className="text-cyan-200 font-semibold text-[10px]">Everything in Free, plus:</span>
-          </div>
-          {premiumFeatures.map((feature, index) => (
-            <div key={index} className="flex items-start gap-1.5">
-              <Check className="text-cyan-300 flex-shrink-0 mt-0.5" size={12} />
-              <span className="text-slate-200 text-[11px]">{feature}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-      {/* Why Upgrade Section */}
-      <div className="max-w-6xl mx-auto mb-12 relative z-10">
-        <div className="glass-ice rounded-xl p-6 border border-cyan-400/20">
-          <h3 className="text-2xl font-bold text-white mb-4 text-center">Why Upgrade to Premium?</h3>
-          
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center mx-auto mb-3">
-                <Zap className="text-cyan-400" size={20} />
-              </div>
-              <h4 className="font-semibold text-white text-sm mb-1">Unlimited Executions</h4>
-              <p className="text-xs text-slate-400">Run code as much as you need</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="text-cyan-400" size={20} />
-              </div>
-              <h4 className="font-semibold text-white text-sm mb-1">AI Assistance</h4>
-              <p className="text-xs text-slate-400">Get unlimited AI-powered hints</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center mx-auto mb-3">
-                <Crown className="text-cyan-400" size={20} />
-              </div>
-              <h4 className="font-semibold text-white text-sm mb-1">Priority Support</h4>
-              <p className="text-xs text-slate-400">Get help whenever you need it</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* FAQ Section */}
-      <div className="max-w-4xl mx-auto mb-12 relative z-10">
-        <div className="text-center mb-6">
-          <h2 className="text-3xl font-bold text-white mb-2">FAQ</h2>
-          <p className="text-slate-400 text-sm">Have questions? We've got answers</p>
-        </div>
-        
-        <div className="space-y-2">
-          {faqItems.map((item) => (
-            <div 
-              key={item.id}
-              className="glass-ice rounded-lg border border-cyan-400/20 hover:border-cyan-400/40 transition-all duration-300 overflow-hidden"
+        {/* --- 2 Column Pricing Layout --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-20 items-center justify-center max-w-3xl mx-auto">
+          {plans.map((plan) => (
+            <motion.div
+              key={plan.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              // Compact Padding: p-6 instead of p-8
+              className={`relative flex flex-col p-6 rounded-3xl border transition-all duration-300 group ${
+                plan.highlight 
+                  ? 'bg-[#0B1120]/80 border-cyan-500/40 shadow-2xl shadow-cyan-900/20 scale-[1.02] z-10' 
+                  : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60'
+              }`}
             >
-              <button
-                onClick={() => setExpandedFAQ(expandedFAQ === item.id ? null : item.id)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-cyan-500/5 transition-colors"
-              >
-                <h3 className="font-semibold text-white text-left text-sm">{item.question}</h3>
-                <div className={`text-cyan-400 flex-shrink-0 transition-transform duration-300 ${expandedFAQ === item.id ? 'rotate-180' : ''}`}>
-                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                    <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </button>
-              
-              {expandedFAQ === item.id && (
-                <div className="px-4 py-3 border-t border-cyan-400/20 bg-cyan-500/5 text-slate-300 text-xs">
-                  {item.answer}
+              {/* Highlight Badge */}
+              {plan.highlight && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg flex items-center gap-1">
+                  <Sparkles size={10} /> Recommended
                 </div>
               )}
-            </div>
+
+              {/* Header - Compact margins */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-bold text-white">{plan.name}</h3>
+                  <div className={`p-2 rounded-lg ${
+                    plan.highlight ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    <plan.icon size={18} />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400">{plan.description}</p>
+              </div>
+
+              {/* Price - Compact margins */}
+              <div className="mb-6 pb-4 border-b border-slate-800/50">
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-3xl font-bold ${plan.highlight ? 'text-white' : 'text-slate-200'}`}>
+                    {plan.price}
+                  </span>
+                  <span className="text-xs text-slate-500 font-medium">{plan.period}</span>
+                </div>
+              </div>
+
+              {/* Features - Reduced spacing */}
+              <div className="flex-1 space-y-3 mb-6">
+                {plan.features.map((feature, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5">
+                    <div className={`p-0.5 rounded-full mt-0.5 flex-shrink-0 ${
+                      plan.highlight ? 'text-cyan-400 bg-cyan-500/10' : 'text-slate-500 bg-slate-800'
+                    }`}>
+                      <Check size={10} strokeWidth={3} />
+                    </div>
+                    <span className={`text-xs leading-tight ${plan.highlight ? 'text-slate-300' : 'text-slate-400'}`}>
+                      {feature}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Button - Compact height */}
+              <button
+                onClick={() => handleGetStarted(plan.name)}
+                className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  plan.buttonVariant === 'gradient'
+                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-900/20 hover:scale-[1.02] active:scale-95'
+                    : 'bg-slate-800 border border-slate-700 text-white hover:bg-slate-700 hover:border-slate-600 hover:text-white active:bg-slate-800'
+                }`}
+              >
+                {plan.buttonText}
+                {plan.highlight && <ArrowRight size={14} />}
+              </button>
+            </motion.div>
           ))}
         </div>
-      </div>
 
-      {/* CTA Section */}
-      <div className="max-w-4xl mx-auto relative z-10">
-        <div className="glass-ice-strong rounded-xl p-8 border border-cyan-400/30 text-center">
-          <h2 className="text-2xl font-bold text-white mb-2">
-            Ready to master DSA?
-          </h2>
-          <p className="text-slate-300 mb-5 text-sm">
-            Join thousands of developers mastering data structures and algorithms
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button 
-              onClick={handleGetStarted}
-              className="px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold hover:from-cyan-400 hover:to-blue-400 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 text-sm"
-            >
-              <Crown size={18} />
-              Start Premium
-            </button>
-            <button 
-              onClick={() => navigate('/auth/signup')}
-              className="px-6 py-2 rounded-lg border border-cyan-400/50 text-cyan-300 font-semibold hover:bg-cyan-400/10 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
-            >
-              Try Free
-              <ArrowRight size={18} />
-            </button>
+        {/* --- FAQ Section (Compact) --- */}
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center gap-2 mb-6 justify-center text-slate-400">
+            <HelpCircle size={16} />
+            <h3 className="text-xs font-bold uppercase tracking-widest">Common Questions</h3>
+          </div>
+          
+          <div className="grid gap-2">
+            {faqItems.map((item) => (
+              <div 
+                key={item.id}
+                className="bg-slate-900/30 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors"
+              >
+                <button
+                  onClick={() => setExpandedFAQ(expandedFAQ === item.id ? null : item.id)}
+                  className="w-full px-5 py-3 flex items-center justify-between text-left group"
+                >
+                  <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{item.question}</span>
+                  <div className={`text-slate-500 transition-transform duration-300 ${expandedFAQ === item.id ? 'rotate-45' : ''}`}>
+                    <Plus size={16} />
+                  </div>
+                </button>
+                
+                <motion.div 
+                  initial={false}
+                  animate={{ height: expandedFAQ === item.id ? "auto" : 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-5 pb-4 pt-0 text-slate-400 text-xs leading-relaxed border-t border-slate-800/50 mt-1 pt-3">
+                    {item.answer}
+                  </div>
+                </motion.div>
+              </div>
+            ))}
           </div>
         </div>
+
       </div>
 
       {/* Subscription Modal */}

@@ -1,13 +1,13 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const passport = require('passport');
+const passport = require("passport");
 const {
   register,
   verifyEmail,
   resendVerificationEmail,
   login,
   googleAuthSuccess,
-  forgotPassword, 
+  forgotPassword,
   resetPassword,
   checkAuth,
   logout,
@@ -15,39 +15,74 @@ const {
   updateUserProfile,
   changePassword,
   deleteProfile,
-  adminRegister
-} = require('../controllers/auth.controller');
+  adminRegister,
+  updateUserRole,
+  getAllUsers,
+  deleteUserByAdmin,
+  getUserDetailsByAdmin
+
+} = require("../controllers/auth.controller");
 
 // const {authenticateUser} = require('../middleware/auth.middleware');
-const {authenticateUser} = require('../middleware/auth.middleware');
-const {authenticateAdmin} = require('../middleware/auth.middleware');
+const { authenticateUser } = require("../middleware/auth.middleware");
+const { authenticateAdmin } = require("../middleware/auth.middleware");
 
 // Regular authentication routes
-router.post('/register', register);
-router.get('/verify-email', verifyEmail);
-router.post('/resend-verification', resendVerificationEmail);
-router.post('/login', login);
-router.post('/logout', logout);
-router.get('/check', checkAuth);
+router.post("/register", register);
+router.get("/verify-email", verifyEmail);
+router.post("/resend-verification", resendVerificationEmail);
+router.post("/login", login);
+router.post("/logout", logout);
+router.get("/check", checkAuth);
 
 // Password reset routes
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 // Google OAuth routes
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-router.get('/google/callback', 
-  passport.authenticate('google', { failureRedirect: `${process.env.FRONTEND_URL}/login?error=oauth_failed` }),
-  googleAuthSuccess
+router.get(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] }),
+);
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: `${process.env.FRONTEND_URL}/login?error=oauth_failed`,
+  }),
+  googleAuthSuccess,
 );
 
 // Protected routes (require authentication)
-router.get('/profile', authenticateUser, getUserProfile);
-router.put('/profile', authenticateUser, updateUserProfile);
-router.post('/change-password', authenticateUser, changePassword);
-router.delete('/profile', authenticateUser, deleteProfile);
+router.get("/profile", authenticateUser, getUserProfile);
+router.put("/profile", authenticateUser, updateUserProfile);
+router.post("/change-password", authenticateUser, changePassword);
+router.delete("/profile", authenticateUser, deleteProfile);
 
 // Admin routes
-router.post('/admin/register', authenticateAdmin, adminRegister);
+router.post("/admin/register", authenticateAdmin, adminRegister);
+
+router.get(
+  "/admin/users",
+  authenticateAdmin,
+  getAllUsers
+);
+
+router.put(
+  "/admin/users/:userId/role",
+  authenticateAdmin,
+  updateUserRole
+);
+
+router.delete(
+  "/admin/users/:userId",
+ authenticateAdmin,
+  deleteUserByAdmin,
+);
+
+router.get(
+  '/admin/users/:userId', 
+   authenticateAdmin,
+  getUserDetailsByAdmin
+);
 
 module.exports = router;
